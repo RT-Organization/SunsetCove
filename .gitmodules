@@ -1,0 +1,4 @@
+[submodule "Plugins/CoreFramework"]
+	path = Plugins/CoreFramework
+	url = https://github.com/Ry4nTR/FrameWorks.git
+	branch = coreframework-branch
