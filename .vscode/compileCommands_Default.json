@@ -1,0 +1,10 @@
+[
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Source\\SunsetCove\\SunsetCove.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_Default\\SunsetCove.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	}
+]
