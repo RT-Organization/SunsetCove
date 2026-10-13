@@ -1,4 +1,9 @@
+/.git
 /.vscode
 /Content
+/DerivedDataCache
 /Intermediate
 /Saved
+/Plugins/CoreFramework/Content
+/Plugins/CoreFramework/Docs
+/Plugins/CoreFramework/Intermediate
