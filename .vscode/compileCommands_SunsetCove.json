@@ -3,7 +3,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\Animation\\AnimationInstance.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -11,7 +11,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\CameraSystem\\CameraManagerComponent.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -19,7 +19,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\Character\\BaseCharacter.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -27,7 +27,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\Character\\InputConfigData.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -35,7 +35,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\CoreFramework.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -43,7 +43,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\Movement\\BaseCharacterMovementComponent.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -51,7 +51,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\StateMachine\\StateMachineComponent.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -59,7 +59,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\Binding\\UIBindingHub.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -67,7 +67,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\Core\\UIGameplayTags.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -75,7 +75,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\Foundation\\BaseActivatableWidget.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -83,7 +83,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\Foundation\\BaseButton.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -91,7 +91,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\Foundation\\BaseUserWidget.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -99,7 +99,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\HUD\\BaseHUD.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -107,7 +107,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\HUD\\BaseHUDWidget.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -115,7 +115,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\Layout\\BaseRootLayoutWidget.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -123,7 +123,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\Manager\\UIFrameSubsystem.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -131,7 +131,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\Menu\\BaseMenuWidget.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -139,7 +139,15 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\UISystem\\Menu\\Tabs\\BaseTabWidget.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.1.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Source\\SunsetCove\\Private\\Character\\SunsetCoveCharacter.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\SunsetCove.0.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
@@ -147,7 +155,7 @@
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Source\\SunsetCove\\SunsetCove.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
-			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\SunsetCove.1.rsp"
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\SunsetCove.0.rsp"
 		],
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	}
