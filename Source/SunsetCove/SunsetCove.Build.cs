@@ -8,7 +8,20 @@ public class SunsetCove : ModuleRules
 	{
 		PCHUsage = PCHUsageMode.UseExplicitOrSharedPCHs;
 	
-		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "Niagara", "UMG", "NavigationSystem", "AIModule", "CoreFramework"});
+		PublicDependencyModuleNames.AddRange(new string[] 
+		{ 
+			"Core", 
+			"CoreUObject", 
+			"Engine", 
+			"InputCore", 
+			"EnhancedInput", 
+			"GameplayTags",
+			"Niagara", 
+			"UMG", 
+			"NavigationSystem", 
+			"AIModule", 
+			"CoreFramework" 
+		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 
