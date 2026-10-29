@@ -1,8 +1,10 @@
 /.git
 /.idea
 /.vscode
+/Blender
 /Content
 /DerivedDataCache
+/Export (blender)
 /Intermediate
 /Saved
 /Plugins/CoreFramework/Content
