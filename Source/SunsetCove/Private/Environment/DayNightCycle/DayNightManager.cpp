@@ -81,6 +81,27 @@ namespace
 	{
 		return HasKeys(Curve) ? Curve : nullptr;
 	}
+
+	/**
+	 * Raises a direction so that it is never lower than MinElevationDegrees above the horizon. The compass heading is kept,
+	 * so the result moves smoothly as the clamp engages and releases. At -90 or below nothing changes.
+	 */
+	FVector ClampElevation(const FVector& Direction, float MinElevationDegrees)
+	{
+		const double MinRad = FMath::DegreesToRadians(static_cast<double>(MinElevationDegrees));
+		const double SinMin = FMath::Sin(MinRad);
+		if (Direction.Z >= SinMin)
+		{
+			return Direction;
+		}
+
+		FVector Horizontal(Direction.X, Direction.Y, 0.0);
+		if (!Horizontal.Normalize())
+		{
+			Horizontal = FVector::ForwardVector; // straight below the horizon: any heading will do
+		}
+		return Horizontal * FMath::Cos(MinRad) + FVector::UpVector * SinMin;
+	}
 }
 
 ADayNightManager::ADayNightManager()
@@ -606,7 +627,8 @@ void ADayNightManager::ApplyLighting()
 	// Geometry: where the sun and the moon are.
 	const float SunAngle = ComputeSunOrbitAngle(Hour);
 	const FVector ToSun = ComputeOrbitDirection(SunAngle);
-	const FVector ToMoon = ComputeOrbitDirection(SunAngle + MoonOrbitOffsetDegrees);
+	// The moon hangs low at the hand-off instead of setting (see MoonMinElevationDegrees).
+	const FVector ToMoon = ClampElevation(ComputeOrbitDirection(SunAngle + MoonOrbitOffsetDegrees), MoonMinElevationDegrees);
 	CachedSunDirection = ToSun;
 
 	const UDayNightLightingProfile* Profile = LightingProfile;

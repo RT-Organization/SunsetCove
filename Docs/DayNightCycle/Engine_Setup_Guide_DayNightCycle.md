@@ -1,16 +1,13 @@
 # Engine Setup Guide — Day/Night Cycle
 
 **Project:** Sunset Cove  |  **Engine:** Unreal Engine 5.8  |  **System:** `ADayNightManager`
-**Revision 2.** **Audience:** level designers, lighting artists, anyone placing the system in a map.
+**Revision 3.** **Audience:** level designers, lighting artists, anyone placing the system in a map.
 **Companion document:** `Architecture_Doc_DayNightCycle.md` (how it works inside, full API, sun/moon visuals).
 
-> **What changed in this revision**
-> - All optional curves are documented with starting keys and the interpolation to use (section 5).
-> - Auto exposure: recommendation, step-by-step setup, and the new exposure curves (sections 3 and 5).
-> - The "gray world" bug is explained and fixed in code; recovery steps in section 8.
-> - New editor buttons on the manager: **Refresh Lighting** and **Reset Post Process Overrides**.
-> - Moon: new default intensity (0.05) and the settings that make it look like a moon (sections 2 and 9).
-> - `SkyAtmosphereActor` is a plain *Actor* reference (your compile fix). Pick the Sky Atmosphere actor as before.
+> **What changed in this revision (3)**
+> - New section 8: dawn and dusk no longer go black. New manager setting **Moon Min Elevation Degrees**, and new starting keys for the sun, moon, sky light and exposure-range curves (section 5).
+> - The Sky Light curve is now a *compensation* multiplier that can go above 1; the Moon curve may too.
+> - Sun and Moon need **different Forward Shading Priority** (section 2.2).
 
 ---
 
@@ -89,6 +86,7 @@ Open the gameplay level. Delete leftover default lights, sky or fog, then add th
 | Atmosphere and Cloud → **Atmosphere Sun Light Index** | **0** |
 | Cast Shadows | ✔ on |
 | Cast Cloud Shadows | ✔ on, if you use Volumetric Clouds |
+| **Forward Shading Priority** (search "forward" in Details) | **1**. Sun and Moon must not share a value: if they do, the viewport shows *"Multiple directional lights are competing…"*. The higher value is used for translucency, water and volumetric fog |
 | Rotation | leave it: the manager overwrites it every frame |
 
 **`DL_Moon`**
@@ -100,6 +98,7 @@ Open the gameplay level. Delete leftover default lights, sky or fog, then add th
 | Atmosphere Sun Light Index | **1** (Unreal supports two atmosphere lights: "a sun and a moon") |
 | **Atmosphere Sun Disk Color Scale** | **start at 0.2** (RGB). This multiplies the brightness of the moon's visible disk. **0 hides the disk entirely** (use that if you add a moon mesh, see section 9) |
 | Light Color | slightly blue, for example R 0.6 · G 0.7 · B 1.0 |
+| **Forward Shading Priority** | **0** (lower than the sun) |
 | Cast Shadows | your call: on gives moon shadows on the sand, off saves one shadow-casting light at night |
 
 **`SkyAtmosphere`** — defaults are fine. Note the **Mie Scattering Scale** value (default about 0.004) if you plan to use the sunset-glow curve.
@@ -179,8 +178,8 @@ The look of the day lives in a **data asset** made of curves.
 ### 4.1 Rules that apply to every curve
 
 - **X axis = hour, 0 to 24** (13.5 = 13:30). Fit the view to 0–24 (**View → Fit**).
-- **A slot left empty means "not driven".** So does a curve **with no keys**: the manager ignores it and writes a warning to `LogSunsetCove`. (An empty curve would read 0 at every hour; see section 8 for what that did.)
-- **Add keys one curve at a time** and look at the viewport after each (press **Refresh Lighting**, section 8.2).
+- **A slot left empty means "not driven".** So does a curve **with no keys**: the manager ignores it and writes a warning to `LogSunsetCove`. (An empty curve would read 0 at every hour.)
+- **Add keys one curve at a time** and look at the viewport after each (press **Refresh Lighting**, section 7).
 - **Loop the day.** The value at hour **24 must equal the value at hour 0** (the sun rotation: plus 360). Make the night a flat plateau at both ends (for example 0–5.4 and 22–24 the same value), so the curve has no kink at midnight.
 - **Add a key:** right-click on the curve → **Add Key**, then type its **Time** and **Value** in the fields of the Curve Editor.
 - **Set interpolation:** select the key → right-click (or the toolbar) → **Interpolation** (Linear / Cubic / Constant) and **Tangent** (Auto / User / Break).
@@ -218,9 +217,9 @@ Hour 24 = hour 0 + 360, so the day loops. **Golden hour tip:** to make the sunse
 
 ### 5.2 `SunIntensityCurve` (float, multiplier 0–1) — Cubic, Auto
 
-`0 → 0` · `5.4 → 0` · `6.5 → 0.15` · `7 → 0.35` · `9 → 0.8` · `11 → 1` · `15.5 → 1` · `18 → 0.8` · `19 → 0.45` · `20 → 0.2` · `20.5 → 0.06` · `21.1 → 0` · `24 → 0`
+`0 → 0` · `5.2 → 0` · `6.0 → 0.3` · `6.5 → 0.6` · `7.5 → 0.85` · `9 → 1` · `16 → 1` · `18.5 → 0.9` · `19.5 → 0.75` · `20.3 → 0.45` · `20.8 → 0.15` · `21.4 → 0` · `24 → 0`
 
-Do **not** drop it to 0 at the horizon: the sky keeps glowing after the sun sets, and that glow is lit by the sun light. Fade out slowly until about 21:00. (The manager hides a light whose multiplier is 0, so it costs no shadow rendering.)
+**Keep the shoulders high.** The atmosphere already dims and reddens a low sun on its own, so the old values (0.15 at sunrise, 0.2 at sunset) dimmed the sun twice and made dawn and dusk dull. Fade it out only once the sun is well below the horizon: 21.4 is about 20° under. Do not cut it to 0 at the horizon either: the sky keeps glowing after the sun sets, and that glow is lit by the sun light. (The manager hides a light whose multiplier is 0, so it costs no shadow rendering.)
 
 ### 5.3 `SunColorCurve` (linear color) — Linear
 
@@ -232,17 +231,19 @@ An extra tint for the sun. The atmosphere already reddens the sun near the horiz
 | G | 0.40 | 0.55 | 0.82 | 0.95 | 0.97 | 0.92 | 0.78 | 0.62 | 0.45 | 0.38 | 0.40 |
 | B | 0.20 | 0.30 | 0.62 | 0.88 | 0.92 | 0.80 | 0.55 | 0.35 | 0.25 | 0.25 | 0.20 |
 
-### 5.4 `MoonIntensityCurve` (float, multiplier) — Cubic, Auto
+### 5.4 `MoonIntensityCurve` (float, multiplier, may exceed 1) — Cubic, Auto
 
-`0 → 1` · `4.5 → 1` · `6.5 → 0` · `20 → 0` · `22 → 1` · `24 → 1`
+`0 → 1` · `4.5 → 1` · `5.5 → 1.5` · `6.8 → 1.5` · `8.5 → 0` · `18.5 → 0` · `19.8 → 1.5` · `21.5 → 1.5` · `23 → 1` · `24 → 1`
 
-Pair it with **Moon Max Intensity = 0.05** (profile). The moon is an atmosphere light: the sky is lit by it like it is lit by the sun, so a high value makes the night sky look like a dim day. Raise it only until the sand is readable.
+This is the main fix for the black hand-off (section 8). The moon **holds at 1.5 through the dawn and dusk hand-off** and fades out only once the sun is well up (8.5), and it fades in before the sun is gone (from 18.5). It works together with the manager's **Moon Min Elevation Degrees** (20): without that setting the moon is below the horizon at the hand-off and this curve would light nothing.
 
-### 5.5 `SkyLightIntensityCurve` (float, multiplier) — Cubic, Auto
+Pair it with **Moon Max Intensity = 0.05**. The moon is an atmosphere light: the sky is lit by it like it is lit by the sun, so a high value makes the night sky look like a dim day. Raise it only until the sand is readable.
 
-The ambient light. Never let the night reach 0.
+### 5.5 `SkyLightIntensityCurve` (float, compensation multiplier, may exceed 1) — Cubic, Auto
 
-`0 → 0.08` · `5.4 → 0.08` · `6.5 → 0.4` · `8 → 1` · `17 → 1` · `19.5 → 0.5` · `21 → 0.1` · `22 → 0.08` · `24 → 0.08`
+`0 → 5` · `5 → 5` · `6 → 4` · `7 → 2.5` · `8 → 1.2` · `9 → 1` · `17 → 1` · `18.5 → 1.2` · `19.5 → 1.8` · `20.5 → 3.5` · `21.5 → 5` · `24 → 5`
+
+**This curve compensates, it does not dim.** A real-time-captured sky light passes on what the sky looks like, and at dusk, night and dawn the captured sky is dark. A low value (the old night value was 0.08) makes the ambient light dark twice over. So the curve is about 1 by day and **rises** as the sky gets darker, which holds the ambient light roughly steady through the hand-off. The two end values (the night plateau, 5) set the **floor of ambient light**: raise them for a brighter night, lower them (try 3) for a darker one.
 
 ### 5.6 `MieScatteringScaleCurve` (float, absolute) — Cubic, Auto
 
@@ -260,13 +261,17 @@ Offsets from **Day Exposure EV100** (section 3.2). Only used with auto exposure 
 - **Max** = how far the eye may *darken* a bright scene.
 - The manager keeps Max ≥ Min. If they ever meet, adaptation is off at that hour.
 
-**Min offset:** `0 → −3` · `5.4 → −3` · `6.5 → −2.5` · `8 → −2` · `18 → −2` · `20 → −2.5` · `21.5 → −3` · `24 → −3`
+**Min offset:** `0 → −3.1` · `7 → −3.1` · `9.5 → −2.1` · `18 → −2.1` · `20.5 → −3.1` · `24 → −3.1`
 
-**Max offset:** `0 → −1` · `5.4 → −1` · `6.5 → 0` · `8 → +1` · `18 → +1` · `19.5 → +0.5` · `21.5 → −1` · `24 → −1`
+**Max offset:** `0 → −1` · `5.4 → −1` · `6.7 → +0.4` · `8 → +1` · `18 → +1` · `19.5 → +0.5` · `21.5 → −1` · `24 → −1`
 
-*Reading it:* by day the eye may brighten up to 2 stops (stepping into the cave) and darken 1 stop. At night it may brighten up to 3 stops and is held from getting darker than 1 stop below the day setting. **Want a darker night? Raise the night Min offset toward −1.5. A brighter night? Lower it toward −4.**
+These use your values (−3.1 at night, −2.1 by day). The one change is on the **Min** curve: it must **not narrow while the scene is still dark**. The first version rose from −3.1 to −2.5 between 5.4 and 6.7, which takes away brightening exactly when the light is lowest. Now the night headroom is kept until 7:00 and only closes once the sun is up (9.5), and it opens again in the evening before the sun is gone (20.5). The Max curve is unchanged.
 
-*Example with a calibration of 1.0:* the day Min is 1.0 − 2 = −1 and the day Max is 1.0 + 1 = 2.
+*Reading it:* by day the eye may brighten up to 2.1 stops (stepping into the cave) and darken 1 stop. At night it may brighten up to 3.1 stops and is held from getting darker than 1 stop below the day setting. **Want a darker night? Raise the night Min offset (toward −1.5). A brighter night? Lower it (toward −4).**
+
+*Example with a calibration of 1.0:* the day Min is 1.0 − 2.1 = −1.1 and the night Min is 1.0 − 3.1 = −2.1.
+
+**Auto tangents and plateaus.** Where a flat stretch meets a ramp, Auto tangents dip slightly below the plateau just before it rises (about 0.07 on your two curves, visible in your screenshots). That is harmless here. To remove it on a curve where it matters, select the plateau's last key and flatten its tangent, or add a key just before it with the same value.
 
 ### 5.8 `ExposureBiasCurve` (float, EV) — Cubic, Auto
 
@@ -280,7 +285,7 @@ The bump at sunset keeps the glow bright; it also works with auto exposure off.
 
 `0 → 0.85` · `5.4 → 0.85` · `7 → 1.0` · `17 → 1.0` · `19.5 → 1.1` · `21.5 → 0.85` · `24 → 0.85`
 
-> **Never leave this curve empty or without keys.** Saturation 0 is a black-and-white world. The manager now ignores a key-less curve, but this was the cause of the gray world (section 8).
+> **Never leave this curve without keys.** Saturation 0 is a black-and-white world. The manager ignores a key-less curve and names it in the log, but it is still worth filling in.
 
 ### 5.10 `WhiteTemperatureCurve` (float, Kelvin) — Cubic, Auto
 
@@ -323,7 +328,7 @@ In the **Details** panel everything is under the **DayNightCycle** category.
 | Post Process Volume | `PPV_DayNight` | optional |
 | Lighting Profile (*Lighting* section) | `DA_DayNightLightingProfile_Default` | recommended |
 
-Sun and Moon must be **two different actors**. Assign the volume **last**, after the profile is filled in (see the rollout order in 8.3).
+Sun and Moon must be **two different actors**. Assign the volume **last**, after the profile is filled in.
 
 **Buttons** (*Lighting* section of the Details panel, editor only)
 
@@ -359,45 +364,58 @@ Sun and Moon must be **two different actors**. Assign the volume **last**, after
 | Sun Path Azimuth Degrees | 0 | world yaw the sun **rises** from. **Rotate it until the sun sets over the sea** |
 | Sun Path Inclination Degrees | 20 | tilts the arc; noon height = 90 − this |
 | Moon Orbit Offset Degrees | 180 | 180 = moon always opposite the sun |
+| **Moon Min Elevation Degrees** | **20** | the moon never sits lower than this above the horizon: it keeps its direction but hangs low instead of setting. A moon below the horizon lights nothing, so without this the scene goes dark at dawn and dusk (section 8). **-90 turns it off** |
 | Fallback Sunrise / Sunset Hour | 6.5 / 20 | only used while there is no *Sun Rotation Curve* |
 
 ---
 
-## 8. The gray world: why it happened, how to fix it
+## 8. Dawn and dusk: keeping the hand-off legible
 
-### 8.1 Why
+Symptom: around 5:30–6:45 (and again after sunset, 20:00–21:00) the scene turns completely black, then recovers.
 
-You connected the Post Process Volume and the whole world went gray. **The cause is almost certainly a curve that is assigned in the profile but has no keys** (probably the Saturation curve).
+### 8.1 Why it goes black
 
-- A curve asset with no keys **reads 0 at every hour**.
-- In the first version of the code an *assigned* curve was always treated as "driven". So it wrote **Saturation = 0** into the volume, and saturation 0 is a black-and-white world. (An empty White Temperature curve would also have written 0 Kelvin, which is an extreme tint; an empty Sun Intensity curve would have switched the sun off.)
-- It showed up **the moment you connected the volume** because in the editor the manager applies the light on every Details-panel change, so the broken values were written into the volume right away.
-- The values were written into the volume's own settings, and a volume in the level is **saved with them**. So even after the curve is fixed, the volume keeps the gray override until you clear it.
+At the hand-off **all three sources of light are low at once**:
 
-It was not that the "post-process curves were not configured": an **unassigned** slot is fine and writes nothing. The bug was the *assigned but empty* case, which the code did not guard against. It does now: any curve with no keys is ignored, and a warning names it in the Output Log (filter `LogSunsetCove`).
+| Source | What happens at dawn (and mirrored at dusk) |
+|---|---|
+| **Sun** | below the horizon until 6:30 (at 6:18 it is about 3° under). A sun under the horizon lights **nothing on the ground**; only the sky glows |
+| **Moon** | the orbit puts it opposite the sun, so it **sets exactly when the sun rises**. Below the horizon it also lights nothing. With the first curve its light at 6:18 is **0.7 %** of what it gives at 02:00, and **0 at 6:30** |
+| **Sky light** | it only passes on what the sky looks like. At the hand-off the captured sky is dark, and the first curve lowered it further |
+| **Exposure** | the first Min offset curve *narrowed* the brightening headroom exactly then (−3.1 → −2.5) |
 
-### 8.2 Fix it now (in this order)
+The glow the atmosphere makes in the minutes around sunrise is also *darker* than your art night: the night moon is an artistic light about 200 times weaker than the sun's peak, while real twilight is thousands of times weaker than a day. So the sun cannot carry the hand-off by itself, and the moon has to.
 
-1. Update the code (`DayNightManager.h/.cpp`, `DayNightLightingProfile.h`, `DayNightTypes.h`) and rebuild.
-2. Select `BP_DayNightManager` → Details → press **Reset Post Process Overrides**. This clears the saturation, white balance, exposure overrides the manager had written on the volume.
-3. Save the level.
-4. Open the profile and either **add keys** to each curve you assigned (section 5), or **clear the slot**.
-5. Press **Refresh Lighting**. The world should be in color again.
+### 8.2 The fix (five parts)
 
-To confirm the diagnosis before step 2: select the volume and look at **Color Grading → Global → Saturation**. If its override is ticked and the value is 0, this was it.
+| # | Change | Where |
+|---|---|---|
+| 1 | **The moon hangs low instead of setting**: new setting *Moon Min Elevation Degrees* = **20** | manager, *Sun Path* |
+| 2 | **The moon holds at 1.5 through the hand-off** and fades out only when the sun is well up | `MoonIntensityCurve` (5.4) |
+| 3 | **Ambient floor**: the sky light is a compensation multiplier that *rises* as the sky darkens | `SkyLightIntensityCurve` (5.5) |
+| 4 | **Do not dim the sun twice**: higher shoulders at sunrise and sunset | `SunIntensityCurve` (5.2) |
+| 5 | **Exposure headroom does not narrow** until the sun is up | `ExposureMinOffsetCurve` (5.7) |
 
-### 8.3 How to roll it out safely
+Also set different **Forward Shading Priority** values on the Sun (1) and Moon (0), section 2.2. With the moon now lit during the hand-off, both lights are on at the same time and the viewport would otherwise show the "Multiple directional lights are competing…" message.
 
-1. Assign **no** Post Process Volume. Fill the light curves first and check the sun, moon and sky.
-2. Add **one post process curve at a time**, in this order: Saturation, White Temperature, Exposure Bias, then the exposure range. After each: press **Refresh Lighting** and scrub **Current Time In Hours** from 0 to 24.
-3. Assign the Post Process Volume.
-4. After any problem, **Reset Post Process Overrides** gives you a clean volume.
+**What part 1 and 2 give.** The moon's light on the ground, as a share of its deep-night value (02:00), computed for these curves:
 
-### 8.4 If it is still gray
+| Hour | 5:00 | 5:30 | 6:00 | 6:18 | 6:30 | 7:00 | 7:30 | 20:00 | 20:30 | 21:00 | 22:00 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| First curves | 33 % | 15 % | 4 % | 0.7 % | **0 %** | 0 % | 0 % | 0 % | 4 % | 15 % | 58 % |
+| New curves | 56 % | 56 % | 56 % | 56 % | 56 % | 49 % | 33 % | 56 % | 56 % | 56 % | 77 % |
 
-- Another Post Process Volume (or the character camera) has its own settings with a higher priority.
-- The viewport is not showing game settings (Perspective menu → **Show → Post Processing** must be on).
-- The Saturation curve has keys but the **values** are 0, or the keys are at the wrong **hours** (for example 0 to 1 instead of 0 to 24).
+The hand-off now stays within about one stop of the deep night instead of dropping out. (The moon's light at its clamp height of 20° is lower than at its night peak; the 1.5 boost brings most of that back.)
+
+### 8.3 Check it
+
+1. Press **Refresh Lighting** after editing the curves. Scrub **Current Time In Hours** from 4 to 9 and from 18 to 23, slowly.
+2. **Rule: the darkest frame of the whole day should be the deep night (around 02:00), never the hand-off.** If 6:00 or 20:30 look darker than 02:00, the hand-off is under-lit.
+3. If a hand-off is too dark, change **one** of these at a time, in this order: (a) the moon hold, 1.5 → 2.0 (`MoonIntensityCurve` keys at 5.5 to 6.8 and 19.8 to 21.5); (b) the night end values of the sky light curve (5 → 7); (c) the night Min offset, lower (−3.1 → −3.8); (d) **Moon Max Intensity** (0.05 → 0.07).
+4. If the hand-off is *brighter* than the night, do the opposite, in the same order.
+5. If the moon looks too much like a floating disk while it hangs low, lower **Atmosphere Sun Disk Color Scale** on `DL_Moon`, or raise **Moon Min Elevation Degrees** a little to keep it higher and shorten the low hover. Setting it to **-90** gives back a normal, setting moon.
+
+The numbers are art starting points. I could not see your render, so check them in the viewport and adjust with the steps above.
 
 ---
 
@@ -433,7 +451,8 @@ For a *distinct* sun and moon made from real assets (textures, meshes, star dome
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| Whole world gray | a curve assigned with no keys wrote 0 saturation | section 8 |
+| Scene black at dawn or dusk | nothing lights the ground at the hand-off | section 8 |
+| Viewport says *Multiple directional lights are competing…* | Sun and Moon have the same Forward Shading Priority | Sun 1, Moon 0 (section 2.2) |
 | Sun does not move, log says *SunDirectionalLight is not assigned* | reference empty | assign `DL_Sun` |
 | Clock never advances | **Is Time Paused** is on (default) | something must call *Start Time*; for tests untick it |
 | Sun moves but the sky has no sunset colors | light not marked **Atmosphere Sun Light**, or Sun and Moon share an index | Sun index 0, Moon index 1 |

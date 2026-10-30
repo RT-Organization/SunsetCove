@@ -5,12 +5,10 @@
 **Audience:** programmers who build on the system. Designers: see `Engine_Setup_Guide_DayNightCycle.md`.
 **Revision 2.**
 
-> **What changed in this revision**
-> - A curve that is assigned but has **no keys** is now ignored (and reported). It used to be sampled as 0, which turned the world gray (4.5).
-> - Auto exposure support: new profile fields `ExposureMode`, `DayExposureEV100`, `ExposureMinOffsetCurve`, `ExposureMaxOffsetCurve` (4.5, 5.4).
-> - New editor buttons and validation: `RefreshLighting`, `ResetPostProcessOverrides`, extra checks at setup time (4.6, 5.1).
-> - `SkyAtmosphereActor` is an `AActor*` (the team's compile fix); `MoonMaxIntensity` default lowered to 0.05 (5.4, 7).
-> - New section 10: how to give the sun and the moon their own visuals (assets, Material Parameter Collection).
+> **What changed in this revision (3)**
+> - New manager property `MoonMinElevationDegrees` (default 20): the moon hangs low at the dawn/dusk hand-off instead of setting (4.4, 5.4).
+> - Profile curve semantics: `SkyLightIntensityCurve` is a compensation multiplier and may exceed 1; `MoonIntensityCurve` may exceed 1; `SunIntensityCurve` shoulders stay high (5.4).
+> - Earlier in revision 2: auto exposure support (`ExposureMode`, `DayExposureEV100`, `ExposureMin/MaxOffsetCurve`), editor buttons `RefreshLighting` and `ResetPostProcessOverrides`, key-less curves ignored, new section 10 on sun and moon visuals.
 
 ---
 
@@ -187,13 +185,14 @@ Light rotation = (-direction).Rotation()                    // a directional lig
 
 - East and Top are unit and perpendicular, so the result is a unit vector and **the horizon crossings stay at 0° and 180° whatever the tilt**. Noon height is `90 − inclination`.
 - The **moon** uses the same circle at `angle + MoonOrbitOffsetDegrees` (default 180: always opposite the sun).
+- **Moon elevation clamp.** The moon direction is then raised so it is never lower than `MoonMinElevationDegrees` (default 20) above the horizon (`ClampElevation` in `DayNightManager.cpp`). It keeps its compass heading, so the motion stays continuous as the clamp engages and releases; at -90 it does nothing. **Why:** a directional light under the horizon lights nothing on the ground, and with the moon opposite the sun both are at the horizon at the same moments (sunrise and sunset), exactly when the sun is also not lighting the ground yet or any more. The hand-off then goes dark. With the clamp, the moon's intensity curve (which may exceed 1) can carry the hand-off. The *light* is clamped; a future visible moon mesh should be fed the same clamped direction, so the visible moon and the moon light agree.
 - **No `SunRotationCurve`?** A fallback arc is used so the system works out of the box: straight lines from `FallbackSunriseHour` (0°) to `FallbackSunsetHour` (180°), then on to 360° across the night.
 - The direction is cached: `GetSunDirection()` and `GetSunElevationDegrees()` cost nothing.
 
 ### 4.5 Lighting rules
 
-1. **An empty slot, or a curve with no keys, means "not driven".** The manager leaves that value as set on the light or volume. This is what lets the system work before art has authored anything. A curve asset with no keys reads **0 at every hour**, so an *assigned but empty* curve is treated exactly like an unassigned one (`HasKeys` / `UsableCurve` in `DayNightManager.cpp`) and reported by `ValidateSetup`. Without this guard, an empty Saturation curve wrote saturation 0 (a gray world), an empty Sun Intensity curve switched the sun off, and an empty Rotation curve froze the sun on the horizon.
-2. **Intensity curves are multipliers**, multiplied by the `Max` value in the profile. One field rescales a whole day.
+1. **An empty slot, or a curve with no keys, means "not driven".** The manager leaves that value as set on the light or volume. This is what lets the system work before art has authored anything. A curve asset with no keys reads **0 at every hour**, so an *assigned but empty* curve is treated exactly like an unassigned one (`HasKeys` / `UsableCurve` in `DayNightManager.cpp`) and reported by `ValidateSetup`: otherwise an empty Saturation curve would write 0, an empty Sun Intensity curve would switch the sun off, and an empty Rotation curve would freeze the sun on the horizon.
+2. **Intensity curves are multipliers**, multiplied by the `Max` value in the profile. One field rescales a whole day. They are **not limited to 1**: the moon curve uses values above 1 at the hand-off, and the sky light curve is a *compensation* (about 1 by day, rising as the captured sky darkens), because a real-time-captured sky light only passes on what the sky looks like.
 3. **Light visibility.** A Sun/Moon light whose multiplier is ≤ 0.001 is hidden (`SetVisibility(false)`), so an inactive light pays no shadow cost. Visibility is only touched when it *changes*, because it rebuilds the light's render state.
 4. **Sky Atmosphere.** The sky color comes from the lights flagged *Atmosphere Sun Light* in the level (Sun index 0, Moon index 1). The manager only drives the Mie scale, and only when it moved by more than 1 % (updating it rebuilds atmosphere data).
 5. **Post Process.** Writes on the volume's `Settings`, setting the matching `bOverride_*` flag, **only for the curves that are usable (rule 1)**. The volume must be Infinite Extent (checked at setup).
@@ -209,7 +208,7 @@ Light rotation = (-direction).Rotation()                    // a directional lig
 - `OnConstruction` and `PostEditChangeProperty` apply the lighting in an **editor world**, so the viewport follows the Details panel: drag `CurrentTimeInHours` to scrub the day.
 - `bSnapToStartHourOnBeginPlay` (default on) resets the clock to `StartHour` at BeginPlay, so a preview time saved in the level never leaks into the game.
 - `ValidateSetup()` runs at BeginPlay, **and in the editor whenever the profile or a reference is assigned**. It writes to `LogSunsetCove`: missing sun, no profile, non-Movable lights, Sun = Moon, a Sky Atmosphere actor with no atmosphere component, a post process volume that is not Unbound, impossible hour order, **every assigned curve that has no keys**, and exposure-range curves used while the project's extended luminance range is off.
-- **Editor writes persist.** In an editor world the manager writes into the light actors and the post process volume placed in the level, and the level saves what is there. That is why the preview works, and also why a bad value (the gray bug) stays in the volume after its cause is fixed. `ResetPostProcessOverrides()` (editor button) switches off every override the manager writes, and marks the volume modified so the clean state is saved. In Play In Editor the actors are copies, so nothing persists.
+- **Editor writes persist.** In an editor world the manager writes into the light actors and the post process volume placed in the level, and the level saves what is there. That is why the preview works, and also why a bad value stays in the volume until it is cleared. `ResetPostProcessOverrides()` (editor button) switches off every override the manager writes, and marks the volume modified so the clean state is saved. In Play In Editor the actors are copies, so nothing persists.
 - **Curve assets do not notify the manager when edited.** Press `RefreshLighting` (editor button) after editing a curve.
 
 ### 4.7 Finding the manager
@@ -295,6 +294,7 @@ All names are in the **`DayNightCycle`** category (with a subcategory after `|`)
 | `SunPathAzimuthDegrees` | float | 0 | world yaw the sun rises from |
 | `SunPathInclinationDegrees` | float | 20 | −60…60. Noon height = 90 − value |
 | `MoonOrbitOffsetDegrees` | float | 180 | |
+| `MoonMinElevationDegrees` | float | 20 | -90…60. The moon never goes lower than this above the horizon. -90 = off (the moon sets normally) |
 | `FallbackSunriseHour` / `FallbackSunsetHour` | float | 6.5 / 20 | only without `SunRotationCurve` |
 
 **References and look**
@@ -313,10 +313,10 @@ All names are in the **`DayNightCycle`** category (with a subcategory after `|`)
 | Property | Type | Default | Notes |
 |---|---|---|---|
 | `SunRotationCurve` | `UCurveFloat` | — | sun position on its arc in degrees (0 rising, 90 top, 180 setting, 270 lowest); hour 24 = hour 0 + 360 |
-| `SunIntensityCurve` / `SunMaxIntensity` | curve / float | — / 10 | multiplier 0–1 × max, in lux |
+| `SunIntensityCurve` / `SunMaxIntensity` | curve / float | — / 10 | multiplier 0–1 × max, in lux. Keep the sunrise/sunset shoulders high: the atmosphere already dims a low sun |
 | `SunColorCurve` | `UCurveLinearColor` | — | optional extra tint |
-| `MoonIntensityCurve` / `MoonMaxIntensity` | curve / float | — / **0.05** | was 0.5 in revision 1 (too bright) |
-| `SkyLightIntensityCurve` / `SkyLightMaxIntensity` | curve / float | — / 1 | |
+| `MoonIntensityCurve` / `MoonMaxIntensity` | curve / float | — / **0.05** | multiplier may exceed 1 (about 1.5 across the hand-off). Max was 0.5 in revision 1 (too bright) |
+| `SkyLightIntensityCurve` / `SkyLightMaxIntensity` | curve / float | — / 1 | compensation multiplier, may exceed 1: about 1 by day, 3–6 at night and twilight |
 | `MieScatteringScaleCurve` | `UCurveFloat` | — | **absolute** Mie scale (atmosphere default about 0.004) |
 | `ExposureMode` | `EDayNightExposureMode` | `LeaveAsIs` | `LeaveAsIs`, `Histogram`, `Basic` |
 | `DayExposureEV100` | float | 1 | calibration: EV100 at which a sunny noon looks right |
@@ -389,12 +389,13 @@ Handlers bound with `AddDynamic` must be `UFUNCTION()`s. Unbind in `EndPlay` if 
 | `OnTimeReached(float TargetHour)` "registrable" | `RegisterTimeTarget` / `UnregisterTimeTarget` + the `TimeReachedTargets` array, empty by default | which hours matter is a gameplay decision |
 | `OnSunSetStarted` (brief) | named `OnSunsetStarted` | spelling of the word |
 | Exposure bias for the post process volume (GDD: "regolare esposizione") | `ExposureBiasCurve` plus, new, an EV100 range (`ExposureMin/MaxOffsetCurve` around `DayExposureEV100`) | with auto exposure on, the bias alone cannot keep the night dark; the range does |
+| The moon follows the sun on the opposite side of the sky | `MoonOrbitOffsetDegrees` (180) **plus** `MoonMinElevationDegrees` (20) | with a pure opposite orbit the moon sets at sunrise and rises at sunset, so the scene is dark at both hand-offs. The clamp keeps it lighting the ground. It is an artistic cheat, and the one place the moon is not astronomically correct |
 | Pre-day 07:00 paused; running; continues after 19:00; reset | as specified | — |
 | Night events at e.g. 02:00 | `SetTimeOfDay(2.f)` | — |
 | Folder `Source/SunsetCove/Environment/DayNightCycle/{Public,Private}` (brief) | `Public/Environment/DayNightCycle/` and `Private/Environment/DayNightCycle/` | the repo's existing layout; nested `Public` folders are not on the include path |
 | Category `DayNightCycle` | `DayNightCycle` with subcategories (`DayNightCycle\|Time`, …) | keeps the Details panel readable. The repo's own style is `SunsetCove\|…`; the GDD wins here |
 
-**Proposals not defined by the GDD** (change freely): wrap at 24:00 and keep running · `NightStartHour = 21` · the moon sits opposite the sun · default max intensities (10 / 0.05 / 1) · the Mie scale as the only atmosphere parameter driven.
+**Proposals not defined by the GDD** (change freely): wrap at 24:00 and keep running · `NightStartHour = 21` · the moon sits opposite the sun but never lower than 20° · default max intensities (10 / 0.05 / 1) · the Mie scale as the only atmosphere parameter driven.
 
 ---
 
@@ -506,7 +507,7 @@ Do **level A now** (it is only settings; section 9 of the Setup Guide). Collect 
 - **The C++ has not been compiled** against UE 5.8 (no engine in the authoring environment). Revision 1 was compiled by the team after the `AActor*` fix; **revision 2 has not been compiled**. The new lines most likely to need a touch-up are: the `FPostProcessSettings` fields `AutoExposureMethod`, `AutoExposureMinBrightness`, `AutoExposureMaxBrightness` (and their `bOverride_` flags), the enum values `AEM_Histogram` / `AEM_Basic`, `APostProcessVolume::bUnbound`, `FRichCurve::GetNumKeys` on `UCurveFloat::FloatCurve` and `UCurveLinearColor::FloatCurves`, and `IConsoleManager::FindTConsoleVariableDataInt`. Earlier risks that remain: `SetMieScatteringScale`, and the `FPostProcessSettings` fields `ColorSaturation` and `WhiteTemp`.
 - **How a 5.8 build treats the exposure range fields.** Epic documents them as EV100 when the extended luminance range is on (the project has it on). Epic's tracker has an open issue about inconsistent clamp limits on these fields (UE-218856, targeted 5.8), which may show up as the editor refusing some typed values.
 - **The numbers in the Setup Guide** (`DayExposureEV100 = 1`, the exposure offsets, the moon values) are art starting points, not measured values.
-- **Not checked:** what the gray world looked like in the project. The diagnosis (an assigned curve with no keys) follows from the code and from how empty curves evaluate; the Setup Guide gives the one-look check on the volume.
+- **The dawn/dusk hand-off values** (moon hold 1.5, clamp 20°, sky light 1–5, sun shoulders, exposure Min offset) are art starting points. The moon's share of ground light was computed numerically (about 56 % of its deep-night value through the hand-off with the new curves, against 0 % at sunrise with the old ones) and the clamp was checked for continuity and unit length, but the final look has to be judged in the viewport. The sky light and exposure parts could not be modelled outside the engine.
 - The `CoreFramework` plugin (a git submodule) was not available, so nothing here depends on it.
 
 **Open design points (GDD `[DA DEFINIRE]`)**

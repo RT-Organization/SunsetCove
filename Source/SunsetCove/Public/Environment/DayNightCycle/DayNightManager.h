@@ -271,6 +271,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DayNightCycle|Sun Path")
 	float MoonOrbitOffsetDegrees = 180.f;
 
+	/**
+	 * The moon never goes lower than this many degrees above the horizon: it keeps its compass direction but hangs low
+	 * instead of setting. A moon below the horizon lights nothing on the ground, so with a normal orbit it sets exactly
+	 * when the sun rises (and rises when the sun sets), and the scene goes dark at the hand-off. The moon's own intensity
+	 * curve decides when it is on. -90 = off: the moon sets normally.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DayNightCycle|Sun Path", meta = (ClampMin = "-90.0", ClampMax = "60.0"))
+	float MoonMinElevationDegrees = 20.f;
+
 	/** Only used when the profile has no SunRotationCurve: hour of sunrise for the built-in arc. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "DayNightCycle|Sun Path", meta = (ClampMin = "0.0", ClampMax = "12.0"))
 	float FallbackSunriseHour = 6.5f;

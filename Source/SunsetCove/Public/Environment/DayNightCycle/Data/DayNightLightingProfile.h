@@ -50,7 +50,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "DayNightCycle|Sun")
 	TObjectPtr<UCurveFloat> SunRotationCurve;
 
-	/** Sun strength multiplier (0 to 1) over the day. Empty = the sun intensity stays as set on the light. */
+	/**
+	 * Sun strength multiplier (0 to 1) over the day. Empty = the sun intensity stays as set on the light.
+	 * Keep the shoulders HIGH (about 0.6 to 0.9 around sunrise and sunset): the atmosphere already dims and reddens a
+	 * low sun by itself, so a low value here dims it a second time. Fade it out only once the sun is well below the horizon.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "DayNightCycle|Sun")
 	TObjectPtr<UCurveFloat> SunIntensityCurve;
 
@@ -69,7 +73,11 @@ public:
 	// Moon
 	// ------------------------------------------------------------------
 
-	/** Moon strength multiplier (0 to 1). The moon follows the sun on the opposite side of the sky. */
+	/**
+	 * Moon strength multiplier. The moon follows the sun on the opposite side of the sky. It may go ABOVE 1: a boost of
+	 * about 1.5 across the dawn and dusk hand-off keeps the scene legible, because the moon hangs low then (see
+	 * MoonMinElevationDegrees on the manager) and a low light lights the ground less.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "DayNightCycle|Moon")
 	TObjectPtr<UCurveFloat> MoonIntensityCurve;
 
@@ -85,7 +93,12 @@ public:
 	// Sky light and atmosphere
 	// ------------------------------------------------------------------
 
-	/** Sky light strength multiplier (0 to 1): the ambient light, which should never fall to zero at night. */
+	/**
+	 * Sky light multiplier over the day. NOT limited to 1: it is a compensation. A real-time-captured sky light only
+	 * passes on what the sky looks like, and at dusk, night and dawn the captured sky is dark, so a low value here makes
+	 * the ambient dark twice over. Use about 1 by day and RAISE it (3 to 6) at dusk, night and dawn to keep a floor of
+	 * ambient light.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "DayNightCycle|Sky")
 	TObjectPtr<UCurveFloat> SkyLightIntensityCurve;
 
