@@ -20,6 +20,7 @@ public class SunsetCove : ModuleRules
 			"UMG", 
 			"NavigationSystem", 
 			"AIModule", 
+			"GameplayTasks",
 			"CoreFramework" 
 		});
 
