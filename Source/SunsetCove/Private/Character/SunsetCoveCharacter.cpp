@@ -9,7 +9,11 @@
 #include "Engine/LocalPlayer.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
+#include "Gameplay/RestSpots/SunsetCoveRestSpotComponent.h"
 #include "InputMappingContext.h"
+#include "InteractionSystem/InteractionComponent.h"
+#include "InventorySystem/PropInventorySystem/PropInventoryComponent.h"
+#include "InventorySystem/ToolInventorySystem/ToolInventoryComponent.h"
 #include "Movement/BaseCharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
 
@@ -21,6 +25,9 @@ ASunsetCoveCharacter::ASunsetCoveCharacter(const FObjectInitializer& ObjectIniti
 
 	// SUNSETCOVE GAME LOGIC: create the components of your game systems here (CreateDefaultSubobject), and set
 	// the default values of the project (capsule size, replication settings of your own properties).
+	Interaction = CreateDefaultSubobject<UInteractionComponent>(TEXT("Interaction"));
+	PropInventory = CreateDefaultSubobject<UPropInventoryComponent>(TEXT("PropInventory"));
+	ToolInventory = CreateDefaultSubobject<UToolInventoryComponent>(TEXT("ToolInventory"));
 }
 
 // ----------------------------------------------------------------------
@@ -40,6 +47,32 @@ void ASunsetCoveCharacter::PostInitializeComponents()
 	}
 
 	// SUNSETCOVE GAME LOGIC: wire your components to each other here (all components exist at this point).
+	if (PropInventory)
+	{
+		// The hand sockets (Prop_R / Prop_L) live on the first-person arms; the body mesh is the alternative.
+		PropInventory->SetHandMeshes(FirstPersonMesh, GetMesh());
+
+		// Grabbing a prop is an interaction: the Interaction System aims, the Prop Inventory does the grab.
+		if (Interaction)
+		{
+			PropInventory->RegisterWithInteraction(Interaction);
+		}
+
+		PropInventory->OnPropAction.AddUniqueDynamic(this, &ASunsetCoveCharacter::OnPropInventoryAction);
+		PropInventory->OnSlotsChanged.AddUniqueDynamic(this, &ASunsetCoveCharacter::OnPropSlotsChanged);
+	}
+
+	if (ToolInventory)
+	{
+		// Same hand sockets as the props: the tool hand (Tool_R, or Prop_R as a fallback) is on the first-person arms too.
+		ToolInventory->SetHandMeshes(FirstPersonMesh, GetMesh());
+
+		// Picking up a tool is an interaction, like grabbing a prop.
+		if (Interaction)
+		{
+			ToolInventory->RegisterWithInteraction(Interaction);
+		}
+	}
 }
 
 void ASunsetCoveCharacter::BeginPlay()
@@ -114,6 +147,16 @@ void ASunsetCoveCharacter::UnPossessed()
 {
 	// Server only. The controller is about to leave this character.
 	// SUNSETCOVE GAME LOGIC: per-player cleanup, before the engine clears the controller.
+	if (PropInventory)
+	{
+		// A placement or a throw charge cannot outlive the player's control (the release input would never arrive).
+		PropInventory->CancelCurrentAction();
+	}
+	if (ToolInventory)
+	{
+		// Same for the open radial menu and a tool in use.
+		ToolInventory->CancelCurrentAction();
+	}
 
 	Super::UnPossessed();
 }
@@ -133,11 +176,27 @@ void ASunsetCoveCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInpu
 // Project hooks
 // ----------------------------------------------------------------------
 
-void ASunsetCoveCharacter::SetupSunsetCoveInput(UEnhancedInputComponent* /*EnhancedInput*/)
+void ASunsetCoveCharacter::SetupSunsetCoveInput(UEnhancedInputComponent* EnhancedInput)
 {
 	// SUNSETCOVE GAME LOGIC: bind the project's own actions here, for example
 	//   EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &ASunsetCoveCharacter::Input_InteractStarted);
 	// The action assets live in your own properties, and their mappings in SunsetCoveMappingContext.
+	//
+	// The CoreFramework has no handler for these actions, so the project binds them itself, through its own components.
+	// Each component owns its Input Action properties; the mappings (E, left / right mouse, wheel, Q) are in the
+	// SunsetCoveMappingContext.
+	if (Interaction)
+	{
+		Interaction->SetupInput(EnhancedInput);         // Interact (E)
+	}
+	if (PropInventory)
+	{
+		PropInventory->SetupInput(EnhancedInput);       // Place (hold), Throw (hold), Rotate (wheel), Drop (Q)
+	}
+	if (ToolInventory)
+	{
+		ToolInventory->SetupInput(EnhancedInput);       // Tool menu (hold Tab), Use tool (left mouse), Drop (Q, shared with props)
+	}
 }
 
 void ASunsetCoveCharacter::OnSunsetCovePerspectiveChanged(ECharacterPerspective /*NewPerspective*/, ECharacterPerspective /*OldPerspective*/)
@@ -149,6 +208,35 @@ void ASunsetCoveCharacter::OnSunsetCoveMovementActionStarted(EMovementAction /*A
 {
 	// SUNSETCOVE GAME LOGIC: react to Dash and Dodge (cancel an interaction, spend a resource, play a game effect).
 	// The state machine already received the action from the framework.
+}
+
+void ASunsetCoveCharacter::OnPropInventoryAction(EPropAction Action, EPropHand /*Hand*/, AActor* Prop)
+{
+	// Only these two change what a visitor may use. A dropped or thrown prop keeps its spots disabled until it is placed.
+	if (!Prop || (Action != EPropAction::Grab && Action != EPropAction::Place))
+	{
+		return;
+	}
+
+	const bool bEnableSpots = (Action == EPropAction::Place);
+
+	TInlineComponentArray<USunsetCoveRestSpotComponent*> RestSpots(Prop);
+	for (USunsetCoveRestSpotComponent* RestSpot : RestSpots)
+	{
+		if (RestSpot)
+		{
+			RestSpot->SetSpotEnabled(bEnableSpots);
+		}
+	}
+}
+
+void ASunsetCoveCharacter::OnPropSlotsChanged()
+{
+	// The two inventories do not know each other: this class is the only place that connects them.
+	if (ToolInventory && PropInventory)
+	{
+		ToolInventory->SetHandsBusy(PropInventory->IsHoldingAnyProp());
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -165,6 +253,13 @@ void ASunsetCoveCharacter::Input_Move(const FInputActionValue& Value)
 void ASunsetCoveCharacter::Input_Look(const FInputActionValue& Value)
 {
 	// SUNSETCOVE GAME LOGIC (before Super): veto or scale look input (for example while aiming).
+	// While the tool radial menu is open the look input picks a sector of the wheel instead of turning the camera.
+	if (ToolInventory && ToolInventory->IsRadialMenuOpen())
+	{
+		ToolInventory->AddRadialInput(Value.Get<FVector2D>());
+		return;
+	}
+
 	Super::Input_Look(Value);
 	// SUNSETCOVE GAME LOGIC (after Super): react to look input.
 }

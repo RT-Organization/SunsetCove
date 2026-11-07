@@ -29,10 +29,14 @@
 
 #include "CoreMinimal.h"
 #include "Character/BaseCharacter.h"
+#include "InventorySystem/PropInventorySystem/PropInventoryTypes.h"
 #include "SunsetCoveCharacter.generated.h"
 
 class UEnhancedInputComponent;
 class UInputMappingContext;
+class UInteractionComponent;
+class UPropInventoryComponent;
+class UToolInventoryComponent;
 enum class EMovementAction : uint8;
 enum class EMovementDomain : uint8;
 
@@ -82,6 +86,28 @@ public:
 	//   Weapons      -> USunsetCoveWeaponComponent       (Public/Gameplay/Weapons/)
 	//   Interaction  -> USunsetCoveInteractionComponent  (Public/Gameplay/Interaction/)
 
+	// ------------------------------------------------------------------
+	// Game systems (components of this character; tune them in BP_Character > Components)
+	// ------------------------------------------------------------------
+
+	/**
+	 * Aims from the camera and handles the Interact action (Public/InteractionSystem/). Grabbing props goes through it:
+	 * the Prop Inventory registers itself as an interaction handler (see PostInitializeComponents).
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SunsetCove|Components")
+	TObjectPtr<UInteractionComponent> Interaction;
+
+	/** The two hands of the player: carry, place, throw and drop props (Public/InventorySystem/PropInventorySystem/). */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SunsetCove|Components")
+	TObjectPtr<UPropInventoryComponent> PropInventory;
+
+	/**
+	 * The tools of the player: pick up, choose from the radial menu, use, drop (Public/InventorySystem/ToolInventorySystem/).
+	 * It never talks to the Prop Inventory: this class tells it when the hands hold props (see OnPropSlotsChanged).
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SunsetCove|Components")
+	TObjectPtr<UToolInventoryComponent> ToolInventory;
+
 protected:
 	// ------------------------------------------------------------------
 	// Project hooks (new virtual functions of this class)
@@ -99,6 +125,21 @@ protected:
 
 	/** Dash or Dodge actually started. Runs on every machine that runs the movement, not while saved moves replay. */
 	virtual void OnSunsetCoveMovementActionStarted(EMovementAction Action, EMovementDomain Domain, float Duration);
+
+	/**
+	 * An action of the Prop Inventory took effect (bound in PostInitializeComponents).
+	 * Rest spots: a prop in the hands is not a place to rest, so Grab disables the rest spots of the prop (a visitor that
+	 * had claimed one goes elsewhere) and Place enables them again. A dropped or thrown prop stays disabled until it is placed.
+	 */
+	UFUNCTION()
+	virtual void OnPropInventoryAction(EPropAction Action, EPropHand Hand, AActor* Prop);
+
+	/**
+	 * A hand of the Prop Inventory was filled or emptied (bound in PostInitializeComponents). GDD: tools cannot be used while
+	 * props are in hand, so the Tool Inventory is told whether the hands are busy.
+	 */
+	UFUNCTION()
+	virtual void OnPropSlotsChanged();
 
 	// ------------------------------------------------------------------
 	// Framework input handlers (overrides, see the note at the top of this file)
