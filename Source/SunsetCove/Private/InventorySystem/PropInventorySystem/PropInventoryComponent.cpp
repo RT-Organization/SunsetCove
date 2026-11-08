@@ -320,6 +320,8 @@ bool UPropInventoryComponent::ValidatePropStructure(const AActor* Prop) const
 
 bool UPropInventoryComponent::TryGrabProp(AActor* Prop)
 {
+	// A new action applies the physical effect of the previous one first, so the slots and the world always agree.
+	CommitPendingAction();
 	PruneDestroyedProps();
 
 	if (!IsValid(Prop))
@@ -355,17 +357,37 @@ bool UPropInventoryComponent::TryGrabProp(AActor* Prop)
 	Slot.SavedCollisionEnabled = Primitive->GetCollisionEnabled();
 
 	// Physics off BEFORE the attach (an attached simulating body fights its parent), then no collision while carried.
+	// The prop freezes where it is: it is being picked up, whatever the animation does next.
 	Primitive->SetPhysicsLinearVelocity(FVector::ZeroVector);
 	Primitive->SetPhysicsAngularVelocityInDegrees(FVector::ZeroVector);
 	Primitive->SetSimulatePhysics(false);
 	Primitive->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
+	// FUTURE (requested by the project owner): instead of attaching at once, the prop should travel toward the hand and attach
+	// to the socket when it arrives (see the notes at the top of PropInventoryComponent.h). CommitGrab is the place.
+	const EPropHand Hand = HandForSlotIndex(SlotIndex);
+	BeginCommit(EPropAction::Grab, Hand, Prop, [this, WeakProp = TWeakObjectPtr<AActor>(Prop), SlotIndex]()
+	{
+		CommitGrab(WeakProp, SlotIndex);
+	});
+
+	// The hand is occupied from this moment, even while the prop has not reached the socket yet.
+	OnSlotsChanged.Broadcast();
+	return true;
+}
+
+void UPropInventoryComponent::CommitGrab(TWeakObjectPtr<AActor> WeakProp, int32 SlotIndex)
+{
+	AActor* Prop = WeakProp.Get();
+	if (!IsValid(Prop) || !Slots.IsValidIndex(SlotIndex) || Slots[SlotIndex].Prop != Prop)
+	{
+		return;
+	}
+
 	AttachPropToHand(Prop, SlotIndex);
 
 	IPropInterface::Execute_OnPropGrabbed(Prop, GetOwner());
 	OnPropAction.Broadcast(EPropAction::Grab, HandForSlotIndex(SlotIndex), Prop);
-	OnSlotsChanged.Broadcast();
-	return true;
 }
 
 void UPropInventoryComponent::AttachPropToHand(AActor* Prop, int32 SlotIndex)
@@ -458,6 +480,7 @@ USceneComponent* UPropInventoryComponent::ResolveHandMesh() const
 
 bool UPropInventoryComponent::BeginPlacement()
 {
+	CommitPendingAction();
 	PruneDestroyedProps();
 
 	if (State != EPropInventoryState::Idle)
@@ -656,7 +679,7 @@ bool UPropInventoryComponent::ConfirmPlacement()
 		return false;
 	}
 
-	PlacePropAt(SlotIndex, FinalTransform);
+	BeginPlace(SlotIndex, FinalTransform);
 	return true;
 }
 
@@ -691,7 +714,7 @@ void UPropInventoryComponent::EndPlacement()
 	SetState(EPropInventoryState::Idle);
 }
 
-void UPropInventoryComponent::PlacePropAt(int32 SlotIndex, const FTransform& WorldTransform)
+void UPropInventoryComponent::BeginPlace(int32 SlotIndex, const FTransform& WorldTransform)
 {
 	if (!IsSlotOccupied(SlotIndex))
 	{
@@ -699,9 +722,30 @@ void UPropInventoryComponent::PlacePropAt(int32 SlotIndex, const FTransform& Wor
 	}
 
 	AActor* Prop = Slots[SlotIndex].Prop;
-	UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Prop->GetRootComponent());
-	ECollisionEnabled::Type RestoredCollision = Slots[SlotIndex].SavedCollisionEnabled;
+	const ECollisionEnabled::Type SavedCollision = Slots[SlotIndex].SavedCollisionEnabled;
 	const EPropHand Hand = HandForSlotIndex(SlotIndex);
+
+	// Logical part: the hand is free from this moment. The prop is still attached until the commit.
+	ClearSlot(SlotIndex);
+
+	BeginCommit(EPropAction::Place, Hand, Prop, [this, WeakProp = TWeakObjectPtr<AActor>(Prop), SavedCollision, Hand, WorldTransform]()
+	{
+		CommitPlace(WeakProp, SavedCollision, Hand, WorldTransform);
+	});
+
+	OnSlotsChanged.Broadcast();
+}
+
+void UPropInventoryComponent::CommitPlace(TWeakObjectPtr<AActor> WeakProp, ECollisionEnabled::Type SavedCollision, EPropHand Hand, const FTransform& WorldTransform)
+{
+	AActor* Prop = WeakProp.Get();
+	if (!IsValid(Prop))
+	{
+		return;
+	}
+
+	UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Prop->GetRootComponent());
+	ECollisionEnabled::Type RestoredCollision = SavedCollision;
 
 	Prop->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 	Prop->SetActorTransform(WorldTransform, /*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
@@ -723,11 +767,8 @@ void UPropInventoryComponent::PlacePropAt(int32 SlotIndex, const FTransform& Wor
 		}
 	}
 
-	ClearSlot(SlotIndex);
-
 	IPropInterface::Execute_OnPropPlaced(Prop, GetOwner());
 	OnPropAction.Broadcast(EPropAction::Place, Hand, Prop);
-	OnSlotsChanged.Broadcast();
 }
 
 // ----------------------------------------------------------------------
@@ -736,6 +777,7 @@ void UPropInventoryComponent::PlacePropAt(int32 SlotIndex, const FTransform& Wor
 
 bool UPropInventoryComponent::BeginThrowCharge()
 {
+	CommitPendingAction();
 	PruneDestroyedProps();
 
 	// Throw wins over a placement in progress: the placement ends without placing, the charge starts.
@@ -813,7 +855,7 @@ bool UPropInventoryComponent::ReleaseThrow()
 	const FVector LinearVelocity = ThrowRotation.Vector() * Speed + OwnerVelocity * InheritOwnerVelocityScale;
 	const FVector AngularVelocity = FMath::VRand() * ThrowSpinDegreesPerSecond;
 
-	ReleasePropToWorld(SlotIndex, EPropAction::Throw, LinearVelocity, AngularVelocity);
+	BeginRelease(SlotIndex, EPropAction::Throw, LinearVelocity, AngularVelocity);
 	return true;
 }
 
@@ -859,11 +901,11 @@ bool UPropInventoryComponent::DropActiveProp()
 	const FVector OwnerVelocity = Owner ? Owner->GetVelocity() : FVector::ZeroVector;
 	const FVector LinearVelocity = Forward * DropForwardSpeed + FVector::UpVector * DropUpSpeed + OwnerVelocity * InheritOwnerVelocityScale;
 
-	ReleasePropToWorld(SlotIndex, EPropAction::Drop, LinearVelocity, FVector::ZeroVector);
+	BeginRelease(SlotIndex, EPropAction::Drop, LinearVelocity, FVector::ZeroVector);
 	return true;
 }
 
-void UPropInventoryComponent::ReleasePropToWorld(int32 SlotIndex, EPropAction Action, const FVector& LinearVelocity, const FVector& AngularVelocityDegrees)
+void UPropInventoryComponent::BeginRelease(int32 SlotIndex, EPropAction Action, const FVector& LinearVelocity, const FVector& AngularVelocityDegrees)
 {
 	if (!IsSlotOccupied(SlotIndex))
 	{
@@ -871,12 +913,32 @@ void UPropInventoryComponent::ReleasePropToWorld(int32 SlotIndex, EPropAction Ac
 	}
 
 	AActor* Prop = Slots[SlotIndex].Prop;
-	UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Prop->GetRootComponent());
 	const ECollisionEnabled::Type SavedCollision = Slots[SlotIndex].SavedCollisionEnabled;
 	const EPropHand Hand = HandForSlotIndex(SlotIndex);
 
-	Prop->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	// Logical part: the hand is free from this moment. The prop is still attached until the commit. The speed was decided now
+	// (at the release); the place the prop leaves from is decided at the commit, where the hand is by then.
 	ClearSlot(SlotIndex);
+
+	BeginCommit(Action, Hand, Prop, [this, WeakProp = TWeakObjectPtr<AActor>(Prop), SavedCollision, Hand, Action, LinearVelocity, AngularVelocityDegrees]()
+	{
+		CommitRelease(WeakProp, SavedCollision, Hand, Action, LinearVelocity, AngularVelocityDegrees);
+	});
+
+	OnSlotsChanged.Broadcast();
+}
+
+void UPropInventoryComponent::CommitRelease(TWeakObjectPtr<AActor> WeakProp, ECollisionEnabled::Type SavedCollision, EPropHand Hand, EPropAction Action, const FVector& LinearVelocity, const FVector& AngularVelocityDegrees)
+{
+	AActor* Prop = WeakProp.Get();
+	if (!IsValid(Prop))
+	{
+		return;
+	}
+
+	UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Prop->GetRootComponent());
+
+	Prop->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
 	// If a wall is between the camera and the hand, release the prop in front of the wall, not inside it.
 	if (UWorld* World = GetWorld())
@@ -917,7 +979,65 @@ void UPropInventoryComponent::ReleasePropToWorld(int32 SlotIndex, EPropAction Ac
 		IPropInterface::Execute_OnPropDropped(Prop, GetOwner());
 	}
 	OnPropAction.Broadcast(Action, Hand, Prop);
-	OnSlotsChanged.Broadcast();
+}
+
+// ----------------------------------------------------------------------
+// Commit timing
+// ----------------------------------------------------------------------
+
+void UPropInventoryComponent::BeginCommit(EPropAction Action, EPropHand Hand, AActor* Prop, TFunction<void()> Commit)
+{
+	// Never two pending effects: the caller flushed the previous one, this is only a guard.
+	CommitPendingAction();
+
+	FActionCommitTiming Timing;
+	if (ActionBeginHook.IsBound())
+	{
+		Timing = ActionBeginHook.Execute(Action, Hand, Prop);
+	}
+
+	UWorld* World = GetWorld();
+	float WaitSeconds = 0.0f;
+	if (Timing.Mode == EActionCommitMode::AfterDelay)
+	{
+		WaitSeconds = Timing.DelaySeconds;
+	}
+	else if (Timing.Mode == EActionCommitMode::OnNotify)
+	{
+		WaitSeconds = Timing.TimeoutSeconds;
+	}
+
+	if (!World || WaitSeconds <= 0.0f)
+	{
+		Commit();
+		return;
+	}
+
+	PendingCommit.Commit = MoveTemp(Commit);
+	PendingCommit.bActive = true;
+	World->GetTimerManager().SetTimer(PendingCommit.Timer, FTimerDelegate::CreateUObject(this, &UPropInventoryComponent::CommitPendingAction), WaitSeconds, /*bLoop=*/false);
+}
+
+void UPropInventoryComponent::CommitPendingAction()
+{
+	if (!PendingCommit.bActive)
+	{
+		return;
+	}
+
+	// Clear first: the effect may start another action (and the timer must not fire a second time).
+	PendingCommit.bActive = false;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PendingCommit.Timer);
+	}
+
+	TFunction<void()> Commit = MoveTemp(PendingCommit.Commit);
+	PendingCommit.Commit = nullptr;
+	if (Commit)
+	{
+		Commit();
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -926,6 +1046,9 @@ void UPropInventoryComponent::ReleasePropToWorld(int32 SlotIndex, EPropAction Ac
 
 void UPropInventoryComponent::CancelCurrentAction()
 {
+	// A pending physical effect cannot outlive the action that asked for it (cancel, end of play, unpossess).
+	CommitPendingAction();
+
 	switch (State)
 	{
 	case EPropInventoryState::Placing:

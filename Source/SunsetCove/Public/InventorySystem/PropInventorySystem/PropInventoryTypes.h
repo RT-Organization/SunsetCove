@@ -6,6 +6,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/Utils/SunsetCoveActionCommit.h"
 #include "Engine/EngineTypes.h"
 #include "GameFramework/Actor.h"
 #include "PropInventoryTypes.generated.h"
@@ -84,10 +85,17 @@ struct FPropSlot
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FPropInventoryStateChangedSignature, EPropInventoryState, NewState, EPropInventoryState, OldState);
 
 /**
- * An action took effect: the prop is now attached (Grab), put down (Place), or left the hand (Throw, Drop). This is the
- * hook for one-shot animations: play the montage for Action from here.
+ * An action took PHYSICAL effect: the prop is now attached (Grab), put down (Place), or left the hand (Throw, Drop). With the
+ * default commit timing that is the instant the player acted; with an ActionBeginHook it can be a little later (the logical state,
+ * the slots and OnSlotsChanged have already changed by then). To START an animation use the ActionBeginHook, not this.
  */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FPropActionSignature, EPropAction, Action, EPropHand, Hand, AActor*, Prop);
+
+/**
+ * C++ hook, asked when an action has been ACCEPTED (the slots already changed) and BEFORE its physical effect (attach, detach, launch).
+ * The listener starts its animation and answers with the commit timing of that action. See Core/Utils/SunsetCoveActionCommit.h.
+ */
+DECLARE_DELEGATE_RetVal_ThreeParams(FActionCommitTiming, FPropActionBeginHook, EPropAction, EPropHand, AActor*);
 
 /** The hologram changed between valid (can be placed here) and invalid. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FPropPlacementValidityChangedSignature, bool, bIsValid);

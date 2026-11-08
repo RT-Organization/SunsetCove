@@ -55,6 +55,7 @@
 #include "Engine/EngineTypes.h"
 #include "Engine/HitResult.h"
 #include "GameFramework/Actor.h"
+#include "Interfaces/ItemIdentityInterface.h"
 #include "TimerManager.h"
 #include "SunsetCoveTool.generated.h"
 
@@ -77,7 +78,7 @@ enum class EToolUseMode : uint8
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FToolUsedSignature, ASunsetCoveTool*, Tool, AActor*, Target, const FHitResult&, Hit);
 
 UCLASS(Blueprintable, ClassGroup = (SunsetCove))
-class SUNSETCOVE_API ASunsetCoveTool : public AActor
+class SUNSETCOVE_API ASunsetCoveTool : public AActor, public IItemIdentityInterface
 {
 	GENERATED_BODY()
 
@@ -106,7 +107,11 @@ public:
 	// Identity (for the UI and the data tables)
 	// ------------------------------------------------------------------
 
-	/** Unique id of the tool. Use the row name of the tool in the "Strumenti" table of SunsetCove_Dati_Oggetti. Two tools with the same id count as the same tool. */
+	/**
+	 * Unique id of the tool: Bucket, Spray, Toy... It is the <Item> of the animator's file names (AS_Arms_<Item>_<Action>_R), the key of the
+	 * arms animation data asset and the row name of the tool in the "Strumenti" table of SunsetCove_Dati_Oggetti. Two tools with the same id
+	 * count as the same tool.
+	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tool|Identity")
 	FName ToolId = NAME_None;
 
@@ -228,6 +233,9 @@ public:
 	/** Where the root of the tool sits relative to the hand socket while it is carried (the grip lands on the socket). The Tool Inventory uses it. */
 	UFUNCTION(BlueprintPure, Category = "Tool")
 	FTransform GetRootInHandSocketTransform() const;
+
+	/** IItemIdentityInterface: the id of the tool is its ToolId. */
+	virtual FName GetItemId_Implementation() const override { return ToolId; }
 
 	/** The actor that holds the tool (the player's pawn), or null while the tool lies in the world. */
 	UFUNCTION(BlueprintPure, Category = "Tool")

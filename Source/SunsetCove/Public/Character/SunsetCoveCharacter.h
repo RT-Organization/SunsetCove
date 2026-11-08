@@ -35,6 +35,7 @@
 class UEnhancedInputComponent;
 class UInputMappingContext;
 class UInteractionComponent;
+class UArmsAnimationComponent;
 class UPropInventoryComponent;
 class UToolInventoryComponent;
 enum class EMovementAction : uint8;
@@ -107,6 +108,13 @@ public:
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SunsetCove|Components")
 	TObjectPtr<UToolInventoryComponent> ToolInventory;
+
+	/**
+	 * The animation of the arms with props and tools (Public/AnimationSystem/ArmsAnimation/). It listens to both inventories, which do not
+	 * know it exists, and plays the animation of the item in the hand through the Arms Animation Set data asset.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SunsetCove|Components")
+	TObjectPtr<UArmsAnimationComponent> ArmsAnimation;
 
 protected:
 	// ------------------------------------------------------------------

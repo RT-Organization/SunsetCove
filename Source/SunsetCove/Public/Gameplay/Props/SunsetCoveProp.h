@@ -53,6 +53,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Interfaces/ItemIdentityInterface.h"
 #include "Interfaces/PropInterface.h"
 #include "SunsetCoveProp.generated.h"
 
@@ -61,7 +62,7 @@ class UBoxComponent;
 class USkeletalMeshComponent;
 
 UCLASS(Blueprintable, ClassGroup = (SunsetCove))
-class SUNSETCOVE_API ASunsetCoveProp : public AActor, public IPropInterface
+class SUNSETCOVE_API ASunsetCoveProp : public AActor, public IPropInterface, public IItemIdentityInterface
 {
 	GENERATED_BODY()
 
@@ -84,6 +85,18 @@ public:
 	/** The skeletal mesh (visual only, no collision). Set its Skeletal Mesh Asset in the Blueprint. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Prop|Components")
 	TObjectPtr<USkeletalMeshComponent> PropMesh;
+
+	// ------------------------------------------------------------------
+	// Identity
+	// ------------------------------------------------------------------
+
+	/**
+	 * Id of the prop: Sunbed, Umbrella... It is the <Item> of the animator's file names (AS_Arms_<Item>_<Action>_<Hand>) and the
+	 * key of the arms animation data asset. Empty: the id is taken from the Blueprint name without the BP_ prefix and the _C suffix
+	 * (BP_Sunbed gives Sunbed), which is the rule the animator follows. Set it by hand for a Blueprint named differently (BP_Sunbed_Proto).
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Prop|Identity")
+	FName PropId = NAME_None;
 
 	// ------------------------------------------------------------------
 	// Grip (how the prop is held)
@@ -190,6 +203,13 @@ public:
 	virtual void OnPropDropped_Implementation(AActor* Holder) override;
 	virtual void OnPropPlaced_Implementation(AActor* Holder) override;
 	virtual void OnPropThrown_Implementation(AActor* Holder) override;
+
+	// ------------------------------------------------------------------
+	// IItemIdentityInterface
+	// ------------------------------------------------------------------
+
+	/** PropId, or the Blueprint name without BP_ / _C when PropId is empty. */
+	virtual FName GetItemId_Implementation() const override;
 
 private:
 	/** Sizes the box from the mesh and centers the mesh in it. Runs from OnConstruction, so it is visible in the Blueprint viewport. */

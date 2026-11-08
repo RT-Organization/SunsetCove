@@ -245,4 +245,6 @@ Put in the level: two different tools (for example `BP_Bucket` with `Tool Id = B
 
 ## 10. Later: the radial menu widget and the animations
 
-The hooks already exist; see `Architecture_Overview.md`, sections 7.3 (the widget) and 7.4 (the animations). In short: **On State Changed** shows the widget, **On Radial Hover Changed** highlights a sector, and **On Tool Action** is where the arms montages are played.
+The hooks already exist; see `Architecture_Overview.md`, sections 7.3 (the widget) and 7.4 (the animations). In short: **On State Changed** shows the widget and **On Radial Hover Changed** highlights a sector.
+
+**Arms animations** are done by the arms animation system: see `../../AnimationSystem/Engine_Setup_Guide.md` (setup, the animator's files, the test checklist) and `../../AnimationSystem/Architecture_Overview.md`. It listens to this component and also decides *when* a tool is shown, hidden, attached or dropped (`Architecture_Overview.md` of this system, section 7.5). Nothing to wire here.

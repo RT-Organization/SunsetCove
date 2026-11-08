@@ -34,14 +34,28 @@
 // STATES (EToolInventoryState)
 //   Idle <-> SelectingTool (the menu action is held). There is no tick: everything is driven by input events.
 //
+// LOGICAL STATE VERSUS PHYSICAL EFFECT (commit timing)
+//   The slots and the equipped tool change the INSTANT the player acts: the tool is equipped, holstered or dropped whatever an
+//   animation does. The PHYSICAL effect (Pickup: attach to the hand and hide; Equip: show; Holster: hide; Drop: detach and launch)
+//   can be delayed to a chosen moment of an animation. The C++ hook ActionBeginHook is asked when an action is accepted and answers
+//   with an FActionCommitTiming (Immediate, AfterDelay, OnNotify). With no hook bound everything is immediate, as before.
+//   While an Equip is pending the tool cannot be used. A new action, CancelCurrentAction, EndPlay and the unpossess flush a pending
+//   effect at once; CommitPendingAction() lets the animation (a notify) release an OnNotify wait. A swap (Holster + Equip in one
+//   call), a drop of the equipped tool and "hands become busy" hide the old tool at once: only the new Equip is timed.
+//   See Core/Utils/SunsetCoveActionCommit.h.
+//
+// FUTURE (requested by the project owner, not done yet): the tool Pickup should not teleport either: the tool should travel toward the
+//   hand and attach when it arrives (same idea as the Grab of the Prop Inventory). The place is the physical part of TryPickupTool.
+//
 // HOOKS FOR LATER WORK (nothing here needs changing to add them)
 //   UI         OnStateChanged shows / hides the radial menu widget. OnRadialHoverChanged gives the sector under the look
 //              direction. GetRadialVector / GetRadialSlotAngle / GetSlotTool lay the widget out; icons and names come from
 //              the tool actors (Icon, DisplayName). SetHoveredSlot lets the widget pick a sector itself (a mouse cursor).
 //              OnActionRefused carries the reason for a "hands busy / inventory full" message.
-//   ANIMATION  OnToolAction(Pickup / Equip / Holster / UseStarted / UseEnded / Drop, SlotIndex, Tool) is the trigger for the
-//              one-shot montages (the character's PlayActionMontages can be called from it). The Animation Blueprint can read
-//              IsToolEquipped, GetEquippedTool and IsUsingTool.
+//   ANIMATION  ActionBeginHook starts the one-shot animation of Pickup / Equip / Holster / Drop and sets when the effect lands.
+//              OnToolAction(UseStarted / UseEnded) and OnEquippedToolChanged feed the Use animation and the hold pose (the arms
+//              animation layer, Public/AnimationSystem/ArmsAnimation/, does it). The Animation Blueprint can read IsToolEquipped,
+//              GetEquippedTool and IsUsingTool.
 //
 // WIRING (done by ASunsetCoveCharacter, the composition root)
 //   SetHandMeshes             tells the component which meshes carry the hand sockets.
@@ -199,6 +213,12 @@ public:
 	// Wiring (called by the character, C++ only)
 	// ------------------------------------------------------------------
 
+	/**
+	 * Optional. Called when Pickup, Equip, Holster or Drop is accepted, before its physical effect. The listener starts its animation and
+	 * returns when the effect must happen. Unbound: the effect is immediate. One listener only (the animation layer).
+	 */
+	FToolActionBeginHook ActionBeginHook;
+
 	/** Tells the component which meshes carry the hand sockets. Either can be null. */
 	void SetHandMeshes(USceneComponent* FirstPersonArms, USceneComponent* BodyMesh);
 
@@ -263,9 +283,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "ToolInventory")
 	bool DropToolInSlot(int32 SlotIndex);
 
-	/** Closes the menu without confirming and ends a use. Safe to call at any time. */
+	/**
+	 * Closes the menu without confirming, ends a use and applies a pending physical effect at once (see the commit timing notes at the
+	 * top). Safe to call at any time.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "ToolInventory")
 	void CancelCurrentAction();
+
+	/**
+	 * Applies the pending physical effect now (the tool attaches, shows, hides or detaches). The arms animation calls it from its commit
+	 * notify. Does nothing if nothing is pending. Safe to call at any time.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "ToolInventory")
+	void CommitPendingAction();
+
+	/** True while an accepted action waits for its physical effect (a delay or a notify). */
+	UFUNCTION(BlueprintPure, Category = "ToolInventory")
+	bool IsCommitPending() const { return PendingCommit.bActive; }
 
 	// ------------------------------------------------------------------
 	// Queries (for the Animation Blueprint, the UI and other systems)
@@ -379,8 +413,25 @@ private:
 	void AttachToolToHand(ASunsetCoveTool* Tool);
 
 	// ---- Equip ----
-	/** Puts the tool of NewIndex in the hand (INDEX_NONE = nothing): holsters the current one first. Broadcasts the events. */
-	void SetEquippedSlot(int32 NewIndex);
+	/**
+	 * Puts the tool of NewIndex in the hand (INDEX_NONE = nothing): holsters the current one first. Broadcasts the events.
+	 * bAllowTimedCommit false: the physical effect (show / hide) is immediate and the hook is not asked (a drop, hands that become busy).
+	 */
+	void SetEquippedSlot(int32 NewIndex, bool bAllowTimedCommit = true);
+
+	// ---- Commit timing ----
+	/** Asks the hook for the timing, then runs Commit now or later. Any earlier pending effect is flushed first. */
+	void BeginCommit(EToolAction Action, int32 SlotIndex, ASunsetCoveTool* Tool, TFunction<void()> Commit);
+	/** The physical part of a Drop: detach, keep out of walls, show, launch. */
+	void CommitDrop(TWeakObjectPtr<ASunsetCoveTool> WeakTool, ECollisionEnabled::Type SavedCollision, const FVector& LinearVelocity);
+
+	/** An accepted action whose physical effect has not happened yet. */
+	struct FPendingCommit
+	{
+		TFunction<void()> Commit;
+		FTimerHandle Timer;
+		bool bActive = false;
+	};
 
 	// ---- Radial menu ----
 	void UpdateHoverFromVector();
@@ -413,6 +464,8 @@ private:
 	TWeakObjectPtr<UInteractionComponent> Interaction;
 
 	TArray<FPendingPawnIgnore> PendingPawnIgnores;
+
+	FPendingCommit PendingCommit;
 
 	EToolInventoryState State = EToolInventoryState::Idle;
 

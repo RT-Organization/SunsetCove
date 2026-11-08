@@ -151,10 +151,11 @@ void UToolInventoryComponent::SetHandsBusy(bool bNewBusy)
 
 	if (bHandsBusy)
 	{
-		// The hands are taken by props: no menu, no use, and the tool is put away and stays away.
+		// The hands are taken by props: no menu, no use, and the tool is put away and stays away. It is hidden at once (no holster
+		// animation): the arm is busy with the prop.
 		StopUsingTool();
 		CloseToolMenu(/*bConfirm=*/false);
-		SetEquippedSlot(INDEX_NONE);
+		SetEquippedSlot(INDEX_NONE, /*bAllowTimedCommit=*/false);
 	}
 }
 
@@ -245,6 +246,8 @@ bool UToolInventoryComponent::HandleInteraction(AActor* Target)
 
 bool UToolInventoryComponent::TryPickupTool(ASunsetCoveTool* Tool)
 {
+	// A new action applies the physical effect of the previous one first, so the slots and the world always agree.
+	CommitPendingAction();
 	PruneDestroyedTools();
 
 	if (!IsValid(Tool) || IsToolOwned(Tool) || Tool->IsHeld())
@@ -295,14 +298,36 @@ bool UToolInventoryComponent::TryPickupTool(ASunsetCoveTool* Tool)
 		Primitive->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 	}
 
-	AttachToolToHand(Tool);
-	Tool->SetActorHiddenInGame(true);
-	Tool->NotifyPickedUp(GetOwner());
+	// FUTURE (requested by the project owner): instead of attaching at once, the tool should travel toward the hand and attach when it
+	// arrives (see the notes at the top of ToolInventoryComponent.h). This lambda is the place.
+	auto PhysicalPickup = [this, WeakTool = TWeakObjectPtr<ASunsetCoveTool>(Tool)]()
+	{
+		ASunsetCoveTool* PickedTool = WeakTool.Get();
+		if (!IsValid(PickedTool))
+		{
+			return;
+		}
+		AttachToolToHand(PickedTool);
+		PickedTool->SetActorHiddenInGame(true);
+		PickedTool->NotifyPickedUp(GetOwner());
+	};
 
+	const bool bAutoEquip = bAutoEquipFirstTool && EquippedSlotIndex == INDEX_NONE && State == EToolInventoryState::Idle;
+	if (bAutoEquip)
+	{
+		// The Equip that follows right away is the animation of this moment, and it shows the tool: the tool goes into the hand now.
+		PhysicalPickup();
+	}
+	else
+	{
+		BeginCommit(EToolAction::Pickup, SlotIndex, Tool, PhysicalPickup);
+	}
+
+	// The tool is in the inventory from this moment, even while it has not reached the hand yet.
 	OnToolAction.Broadcast(EToolAction::Pickup, SlotIndex, Tool);
 	OnSlotsChanged.Broadcast();
 
-	if (bAutoEquipFirstTool && EquippedSlotIndex == INDEX_NONE && State == EToolInventoryState::Idle)
+	if (bAutoEquip)
 	{
 		SetEquippedSlot(SlotIndex);
 	}
@@ -444,8 +469,11 @@ bool UToolInventoryComponent::HolsterTool()
 	return true;
 }
 
-void UToolInventoryComponent::SetEquippedSlot(int32 NewIndex)
+void UToolInventoryComponent::SetEquippedSlot(int32 NewIndex, bool bAllowTimedCommit)
 {
+	// A new action applies the physical effect of the previous one first (a tool still waiting to be shown or hidden).
+	CommitPendingAction();
+
 	if (NewIndex != INDEX_NONE && !IsSlotOccupied(NewIndex))
 	{
 		NewIndex = INDEX_NONE;
@@ -465,8 +493,25 @@ void UToolInventoryComponent::SetEquippedSlot(int32 NewIndex)
 	if (OldTool)
 	{
 		EquippedSlotIndex = INDEX_NONE;
-		OldTool->SetActorHiddenInGame(true);
-		OldTool->NotifyHolstered();
+
+		auto PhysicalHolster = [WeakTool = TWeakObjectPtr<ASunsetCoveTool>(OldTool)]()
+		{
+			if (ASunsetCoveTool* HolsteredTool = WeakTool.Get(); IsValid(HolsteredTool))
+			{
+				HolsteredTool->SetActorHiddenInGame(true);
+				HolsteredTool->NotifyHolstered();
+			}
+		};
+
+		// A swap hides the old tool at once: only the Equip of the new one is animated and timed.
+		if (bAllowTimedCommit && NewIndex == INDEX_NONE)
+		{
+			BeginCommit(EToolAction::Holster, OldIndex, OldTool, PhysicalHolster);
+		}
+		else
+		{
+			PhysicalHolster();
+		}
 		OnToolAction.Broadcast(EToolAction::Holster, OldIndex, OldTool);
 	}
 	EquippedSlotIndex = INDEX_NONE;
@@ -476,8 +521,24 @@ void UToolInventoryComponent::SetEquippedSlot(int32 NewIndex)
 	{
 		NewTool = Slots[NewIndex].Tool;
 		EquippedSlotIndex = NewIndex;
-		NewTool->SetActorHiddenInGame(false);
-		NewTool->NotifyEquipped();
+
+		auto PhysicalEquip = [WeakTool = TWeakObjectPtr<ASunsetCoveTool>(NewTool)]()
+		{
+			if (ASunsetCoveTool* EquippedTool = WeakTool.Get(); IsValid(EquippedTool))
+			{
+				EquippedTool->SetActorHiddenInGame(false);
+				EquippedTool->NotifyEquipped();
+			}
+		};
+
+		if (bAllowTimedCommit)
+		{
+			BeginCommit(EToolAction::Equip, NewIndex, NewTool, PhysicalEquip);
+		}
+		else
+		{
+			PhysicalEquip();
+		}
 		OnToolAction.Broadcast(EToolAction::Equip, NewIndex, NewTool);
 	}
 
@@ -628,7 +689,8 @@ bool UToolInventoryComponent::StartUsingTool()
 {
 	PruneDestroyedTools();
 
-	if (State != EToolInventoryState::Idle || bHandsBusy || bUsingTool)
+	// A tool that is still being shown (an Equip waiting for its animation) cannot be used yet.
+	if (State != EToolInventoryState::Idle || bHandsBusy || bUsingTool || PendingCommit.bActive)
 	{
 		return false;
 	}
@@ -666,6 +728,7 @@ void UToolInventoryComponent::StopUsingTool()
 
 bool UToolInventoryComponent::DropToolInSlot(int32 SlotIndex)
 {
+	CommitPendingAction();
 	PruneDestroyedTools();
 
 	if (!IsSlotOccupied(SlotIndex))
@@ -675,16 +738,16 @@ bool UToolInventoryComponent::DropToolInSlot(int32 SlotIndex)
 
 	ASunsetCoveTool* Tool = Slots[SlotIndex].Tool;
 
-	// A tool in the hand is put away first, so its use ends and the events come in order (Holster, then Drop).
+	// A tool in the hand is put away first, so its use ends and the events come in order (Holster, then Drop). It is hidden at once:
+	// only the Drop is animated and timed.
 	if (SlotIndex == EquippedSlotIndex)
 	{
-		SetEquippedSlot(INDEX_NONE);
+		SetEquippedSlot(INDEX_NONE, /*bAllowTimedCommit=*/false);
 	}
 
-	UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Tool->GetRootComponent());
 	const ECollisionEnabled::Type SavedCollision = Slots[SlotIndex].SavedCollisionEnabled;
 
-	Tool->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
+	// Logical part: the slot is free from this moment. The tool stays attached (hidden) until the commit.
 	Slots[SlotIndex].Reset();
 
 	// Dropping from the open menu: the sector is empty now, and letting go of the menu action must not put the equipped tool away.
@@ -694,6 +757,38 @@ bool UToolInventoryComponent::DropToolInSlot(int32 SlotIndex)
 		SetHoveredSlotInternal(INDEX_NONE);
 		bConfirmSuppressed = true;
 	}
+
+	// The speed is decided now (the heading of the player at the drop); where the tool leaves from is decided at the commit.
+	AActor* Owner = GetOwner();
+	FVector ViewLocation;
+	FRotator ViewRotation;
+	SunsetCoveView::GetOwnerViewPoint(Owner, ViewLocation, ViewRotation);
+
+	// Forward along the heading only: looking down must not push the tool into the floor.
+	const FVector Forward = FRotator(0.0f, ViewRotation.Yaw, 0.0f).Vector();
+	const FVector OwnerVelocity = Owner ? Owner->GetVelocity() : FVector::ZeroVector;
+	const FVector LinearVelocity = Forward * DropForwardSpeed + FVector::UpVector * DropUpSpeed + OwnerVelocity * InheritOwnerVelocityScale;
+
+	BeginCommit(EToolAction::Drop, SlotIndex, Tool, [this, WeakTool = TWeakObjectPtr<ASunsetCoveTool>(Tool), SavedCollision, LinearVelocity]()
+	{
+		CommitDrop(WeakTool, SavedCollision, LinearVelocity);
+	});
+
+	OnToolAction.Broadcast(EToolAction::Drop, SlotIndex, Tool);
+	OnSlotsChanged.Broadcast();
+	return true;
+}
+
+void UToolInventoryComponent::CommitDrop(TWeakObjectPtr<ASunsetCoveTool> WeakTool, ECollisionEnabled::Type SavedCollision, const FVector& LinearVelocity)
+{
+	ASunsetCoveTool* Tool = WeakTool.Get();
+	if (!IsValid(Tool))
+	{
+		return;
+	}
+
+	UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Tool->GetRootComponent());
+	Tool->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
 	AActor* Owner = GetOwner();
 	FVector ViewLocation;
@@ -717,11 +812,6 @@ bool UToolInventoryComponent::DropToolInSlot(int32 SlotIndex)
 
 	if (Primitive)
 	{
-		// Forward along the heading only: looking down must not push the tool into the floor.
-		const FVector Forward = FRotator(0.0f, ViewRotation.Yaw, 0.0f).Vector();
-		const FVector OwnerVelocity = Owner ? Owner->GetVelocity() : FVector::ZeroVector;
-		const FVector LinearVelocity = Forward * DropForwardSpeed + FVector::UpVector * DropUpSpeed + OwnerVelocity * InheritOwnerVelocityScale;
-
 		// A dropped tool must fall: it needs collision WITH physics, whatever it had before it was picked up.
 		Primitive->SetCollisionEnabled(ToolCollisionHasPhysics(SavedCollision) ? SavedCollision : ECollisionEnabled::QueryAndPhysics);
 		ApplyTemporaryPawnIgnore(Primitive);
@@ -733,9 +823,65 @@ bool UToolInventoryComponent::DropToolInSlot(int32 SlotIndex)
 	}
 
 	Tool->NotifyDropped();
-	OnToolAction.Broadcast(EToolAction::Drop, SlotIndex, Tool);
-	OnSlotsChanged.Broadcast();
-	return true;
+}
+
+// ----------------------------------------------------------------------
+// Commit timing
+// ----------------------------------------------------------------------
+
+void UToolInventoryComponent::BeginCommit(EToolAction Action, int32 SlotIndex, ASunsetCoveTool* Tool, TFunction<void()> Commit)
+{
+	// Never two pending effects: the callers flushed the previous one, this is only a guard.
+	CommitPendingAction();
+
+	FActionCommitTiming Timing;
+	if (ActionBeginHook.IsBound())
+	{
+		Timing = ActionBeginHook.Execute(Action, SlotIndex, Tool);
+	}
+
+	UWorld* World = GetWorld();
+	float WaitSeconds = 0.0f;
+	if (Timing.Mode == EActionCommitMode::AfterDelay)
+	{
+		WaitSeconds = Timing.DelaySeconds;
+	}
+	else if (Timing.Mode == EActionCommitMode::OnNotify)
+	{
+		WaitSeconds = Timing.TimeoutSeconds;
+	}
+
+	if (!World || WaitSeconds <= 0.0f)
+	{
+		Commit();
+		return;
+	}
+
+	PendingCommit.Commit = MoveTemp(Commit);
+	PendingCommit.bActive = true;
+	World->GetTimerManager().SetTimer(PendingCommit.Timer, FTimerDelegate::CreateUObject(this, &UToolInventoryComponent::CommitPendingAction), WaitSeconds, /*bLoop=*/false);
+}
+
+void UToolInventoryComponent::CommitPendingAction()
+{
+	if (!PendingCommit.bActive)
+	{
+		return;
+	}
+
+	// Clear first: the effect may start another action (and the timer must not fire a second time).
+	PendingCommit.bActive = false;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(PendingCommit.Timer);
+	}
+
+	TFunction<void()> Commit = MoveTemp(PendingCommit.Commit);
+	PendingCommit.Commit = nullptr;
+	if (Commit)
+	{
+		Commit();
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -744,6 +890,9 @@ bool UToolInventoryComponent::DropToolInSlot(int32 SlotIndex)
 
 void UToolInventoryComponent::CancelCurrentAction()
 {
+	// A pending physical effect cannot outlive the action that asked for it (cancel, end of play, unpossess).
+	CommitPendingAction();
+
 	StopUsingTool();
 	CloseToolMenu(/*bConfirm=*/false);
 }

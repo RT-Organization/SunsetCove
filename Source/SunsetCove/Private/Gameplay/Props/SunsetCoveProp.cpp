@@ -161,6 +161,20 @@ FRotator ASunsetCoveProp::GetPropHoldRotationOffset_Implementation(bool bRightHa
 	return ComputeRootInHandSocket(bRightHand).Rotator();
 }
 
+FName ASunsetCoveProp::GetItemId_Implementation() const
+{
+	if (!PropId.IsNone())
+	{
+		return PropId;
+	}
+
+	// BP_Sunbed_C -> Sunbed. A native class without these decorations is returned as it is.
+	FString Name = GetClass()->GetName();
+	Name.RemoveFromStart(TEXT("BP_"));
+	Name.RemoveFromEnd(TEXT("_C"));
+	return FName(*Name);
+}
+
 void ASunsetCoveProp::OnPropGrabbed_Implementation(AActor* Holder)
 {
 	PlayOptionalAnimation(PickedUpAnimation);

@@ -35,11 +35,24 @@
 //   Throw / Drop: detach, collision back on (with physics), physics on, velocity set directly (mass independent).
 //   For a short time after leaving the hand the prop ignores the Pawn channel, so it does not hit the thrower.
 //
+// LOGICAL STATE VERSUS PHYSICAL EFFECT (commit timing)
+//   The slots, the hands and OnSlotsChanged change the INSTANT the player acts: the hand is occupied (Grab) or free (Place, Throw,
+//   Drop) whatever an animation does. The PHYSICAL effect (attach to the socket, detach, move to the hologram, launch) can be
+//   delayed to a chosen moment of an animation. The C++ hook ActionBeginHook is asked when an action is accepted and answers with an
+//   FActionCommitTiming (Immediate, AfterDelay, OnNotify). With no hook bound everything is immediate, exactly as before.
+//   A new action, CancelCurrentAction, EndPlay and the unpossess flush a pending effect at once. CommitPendingAction() lets the
+//   animation (a notify) release an OnNotify wait. See Core/Utils/SunsetCoveActionCommit.h.
+//
+// FUTURE (requested by the project owner, not done yet): the prop must not teleport to the hand. On a Grab it should TRAVEL
+//   toward the hand (a short move of the prop) and attach to the socket when it arrives. The place to do it is CommitGrab: the
+//   logical grab has already happened, so a travel can run between the hook (animation starts) and the attach. Same idea for the
+//   Pickup of the Tool Inventory.
+//
 // HOOKS FOR LATER WORK (nothing here needs changing to add them)
 //   UI         OnThrowChargeChanged (0..1) feeds the charge bar; OnStateChanged shows and hides it.
-//   ANIMATION  OnPropAction(Grab / Place / Throw / Drop, Hand, Prop) is the trigger for the one-shot montages (the
-//              character's PlayActionMontages can be called from it). The Animation Blueprint can read the state through
-//              GetState, IsHoldingAnyProp and IsHandOccupied.
+//   ANIMATION  ActionBeginHook starts the one-shot animation of Grab / Place / Throw / Drop and sets when the effect lands (the arms
+//              animation layer, Public/AnimationSystem/ArmsAnimation/, does it). The Animation Blueprint can read the state
+//              through GetState, IsHoldingAnyProp and IsHandOccupied.
 //   TOOLS      The Tool Inventory (Public/InventorySystem/ToolInventorySystem/) is refused while IsHoldingAnyProp is true
 //              (GDD). The character tells it from OnSlotsChanged; the two systems do not include each other.
 //
@@ -274,6 +287,12 @@ public:
 	// Wiring (called by the character, C++ only)
 	// ------------------------------------------------------------------
 
+	/**
+	 * Optional. Called when an action (Grab, Place, Throw, Drop) is accepted, before its physical effect. The listener starts its
+	 * animation and returns when the effect must happen. Unbound: the effect is immediate. One listener only (the animation layer).
+	 */
+	FPropActionBeginHook ActionBeginHook;
+
 	/** Tells the component which meshes carry the hand sockets. Either can be null. */
 	void SetHandMeshes(USceneComponent* FirstPersonArms, USceneComponent* BodyMesh);
 
@@ -315,9 +334,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PropInventory")
 	bool DropActiveProp();
 
-	/** Ends a placement or a throw charge without doing anything with the prop. Safe to call at any time. */
+	/**
+	 * Ends a placement or a throw charge without doing anything with the prop, and applies a pending physical effect at once
+	 * (see the commit timing notes at the top). Safe to call at any time.
+	 */
 	UFUNCTION(BlueprintCallable, Category = "PropInventory")
 	void CancelCurrentAction();
+
+	/**
+	 * Applies the pending physical effect now (the prop attaches, detaches or launches). The arms animation calls it from its commit
+	 * notify. Does nothing if nothing is pending. Safe to call at any time.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "PropInventory")
+	void CommitPendingAction();
+
+	/** True while an accepted action waits for its physical effect (a delay or a notify). */
+	UFUNCTION(BlueprintPure, Category = "PropInventory")
+	bool IsCommitPending() const { return PendingCommit.bActive; }
 
 	// ------------------------------------------------------------------
 	// Queries (for the Animation Blueprint, the UI and other systems)
@@ -422,13 +455,33 @@ private:
 	// ---- Placement ----
 	void UpdatePlacement();
 	void EndPlacement();
-	void PlacePropAt(int32 SlotIndex, const FTransform& WorldTransform);
+	/** Logical part of a Place: the hand is free at once. The physical part (CommitPlace) follows the commit timing. */
+	void BeginPlace(int32 SlotIndex, const FTransform& WorldTransform);
+	void CommitPlace(TWeakObjectPtr<AActor> WeakProp, ECollisionEnabled::Type SavedCollision, EPropHand Hand, const FTransform& WorldTransform);
 
 	// ---- Throw and drop ----
 	void UpdateThrowCharge(float DeltaTime);
 	void EndThrowCharge();
+	/** Logical part of a Throw or Drop: the hand is free at once. The physical part (CommitRelease) follows the commit timing. */
+	void BeginRelease(int32 SlotIndex, EPropAction Action, const FVector& LinearVelocity, const FVector& AngularVelocityDegrees);
 	/** Detaches the prop from its hand and hands it to the physics engine. Shared by Throw and Drop. */
-	void ReleasePropToWorld(int32 SlotIndex, EPropAction Action, const FVector& LinearVelocity, const FVector& AngularVelocityDegrees);
+	void CommitRelease(TWeakObjectPtr<AActor> WeakProp, ECollisionEnabled::Type SavedCollision, EPropHand Hand, EPropAction Action, const FVector& LinearVelocity, const FVector& AngularVelocityDegrees);
+
+	// ---- Grab (physical part) ----
+	/** Attaches the prop to the hand socket and tells the prop and the listeners. */
+	void CommitGrab(TWeakObjectPtr<AActor> WeakProp, int32 SlotIndex);
+
+	// ---- Commit timing ----
+	/** Asks the hook for the timing, then runs Commit now or later. Any earlier pending effect has been flushed before. */
+	void BeginCommit(EPropAction Action, EPropHand Hand, AActor* Prop, TFunction<void()> Commit);
+
+	/** An accepted action whose physical effect has not happened yet. */
+	struct FPendingCommit
+	{
+		TFunction<void()> Commit;
+		FTimerHandle Timer;
+		bool bActive = false;
+	};
 
 	// ---- Temporary Pawn-ignore after release ----
 	void ApplyTemporaryPawnIgnore(UPrimitiveComponent* Primitive);
@@ -457,6 +510,8 @@ private:
 	TWeakObjectPtr<UInteractionComponent> Interaction;
 
 	TArray<FPendingPawnIgnore> PendingPawnIgnores;
+
+	FPendingCommit PendingCommit;
 
 	/** Props that already got a "bad structure" warning (so the log is not flooded while the player aims at one). */
 	mutable TSet<TWeakObjectPtr<const AActor>> WarnedProps;

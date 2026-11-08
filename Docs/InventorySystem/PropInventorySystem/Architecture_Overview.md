@@ -321,13 +321,29 @@ Edit them on the **Prop Inventory** component of `BP_Character` (Components pane
 | Hook | Type | Fires | Use |
 |---|---|---|---|
 | `OnStateChanged(New, Old)` | delegate | state change | show / hide the placement UI and the charge bar |
-| `OnPropAction(Action, Hand, Prop)` | delegate | when an action takes effect: `Grab` (prop attached), `Place` (prop put down), `Throw` / `Drop` (prop left the hand) | **one-shot animations**: play the montage for `Action`. Call the character's `PlayActionMontages` from here |
+| `OnPropAction(Action, Hand, Prop)` | delegate | when an action takes **physical** effect: `Grab` (prop attached), `Place` (prop put down), `Throw` / `Drop` (prop left the hand) | reactions to the effect (rest spots, sound). **To start an animation use the `ActionBeginHook` (9.5), not this**: the arms animation system does |
 | `OnThrowChargeChanged(float)` | delegate | each frame while charging, and once with 0 at the end | **the throw charge bar** (the only UI of this system) |
 | `OnPlacementValidityChanged(bool)` | delegate | the hologram flips valid / invalid | optional feedback (sound, crosshair tint) |
 | `OnSlotsChanged()` | delegate | a hand filled or emptied | inventory icons, if ever needed |
 | `GetState`, `IsHoldingAnyProp`, `IsHandOccupied(Hand)`, `GetPropInHand(Hand)`, `GetActiveProp`, `GetActiveHand`, `GetThrowCharge`, `IsPlacementValid` | BlueprintPure | on demand | the **Animation Blueprint** (hold poses, charge pose) and other systems |
 
-Timing note for animation: the actions take effect **immediately** when the input arrives. If an animation must delay the effect (release the prop at a montage notify), the place to add it is a deferral inside `ReleasePropToWorld` / `TryGrabProp` / `PlacePropAt`; the delegates will not need to change.
+Timing note for animation: see 9.5. The logical state is immediate; the physical effect can be delayed by the arms animation system, which starts its animation from the `ActionBeginHook`. **Arms animation system:** `../../AnimationSystem/Architecture_Overview.md`.
+
+### 9.5 Commit timing: logical state now, physical effect when the animation says
+
+The slots, the hands and `OnSlotsChanged` change the **instant the player acts**: after a Grab the hand is occupied, after a Place, Throw or Drop it is free, whatever an animation does. The **physical effect** can be delayed to a moment of an animation:
+
+| Action | Immediate part (logical) | Delayed part (physical, `Commit...`) |
+|---|---|---|
+| Grab | slot filled, physics and collision off (the prop freezes where it is), `OnSlotsChanged` | `CommitGrab`: attach to the hand socket, `OnPropGrabbed`, `OnPropAction(Grab)` |
+| Place | slot emptied, `OnSlotsChanged` | `CommitPlace`: detach, move to the hologram transform captured at the release, collision back, `OnPropPlaced`, `OnPropAction(Place)` |
+| Throw, Drop | slot emptied, launch speed decided, `OnSlotsChanged` | `CommitRelease`: detach, wall-safety trace from where the hand is now, launch, `OnPropThrown` / `OnPropDropped`, `OnPropAction` |
+
+`UPropInventoryComponent::ActionBeginHook` (a C++ delegate) is called after the logical part and before the physical part; its listener starts an animation and returns an `FActionCommitTiming` (`Core/Utils/SunsetCoveActionCommit.h`): **Immediate**, **AfterDelay** or **OnNotify** (then `CommitPendingAction()` releases it, with a timeout as a safety net). **With no hook bound everything is immediate, exactly as before.** `OnPropAction` keeps meaning "the physical effect took place".
+
+A new action (`TryGrabProp`, `BeginPlacement`, `BeginThrowCharge`), `CancelCurrentAction` (also called by `DropActiveProp`, `EndPlay` and the unpossess) apply a pending effect at once. A prop destroyed while pending is skipped. `IsCommitPending()` says whether one is waiting. The actions now mean "accepted": for example `TryGrabProp` returns true although the attach may follow a moment later.
+
+**Future work (requested by the project owner):** the prop should not teleport to the hand. On a Grab it should travel toward the hand and attach to the socket when it arrives. The place is `CommitGrab` (a `FUTURE:` comment marks it in `TryGrabProp` and at the top of the header).
 
 ### 9.2 Rest spots (visitors)
 
@@ -373,6 +389,6 @@ Untouched. Used as-is: `ABaseCharacter::FirstPersonMesh` (hand mesh), the manage
 | Prop-side reactions (sound, particles) | Implement `OnPropGrabbed / Dropped / Placed / Thrown` on the prop. |
 | Throw feel | Tune `Min/MaxThrowSpeed`, `ChargeTimeToPeak`, `ThrowPitchOffsetDegrees`, `bPingPongCharge`. |
 | A charge bar | Bind `OnThrowChargeChanged` and `OnStateChanged` in a widget. |
-| Animations | Bind `OnPropAction`; read `GetState` / `IsHoldingAnyProp` in the Animation Blueprint. |
+| Animations | Done by the arms animation system (`../../AnimationSystem/Architecture_Overview.md`): it uses `ActionBeginHook` and the delegates. |
 | A third hand slot or two-handed props | `Slots` is a fixed array of 2 and `SlotIndexFor` / `HandForSlotIndex` map the hands; this is the place to start. A prop that needs both hands would need a slot-count field on the interface. |
 | Other interactions (barrier button, bed) | Not here: implement `IInteractableInterface` on the actor (see the Interaction System document). |

@@ -3,6 +3,7 @@
 
 #include "Character/SunsetCoveCharacter.h"
 
+#include "AnimationSystem/ArmsAnimation/ArmsAnimationComponent.h"
 #include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -28,6 +29,7 @@ ASunsetCoveCharacter::ASunsetCoveCharacter(const FObjectInitializer& ObjectIniti
 	Interaction = CreateDefaultSubobject<UInteractionComponent>(TEXT("Interaction"));
 	PropInventory = CreateDefaultSubobject<UPropInventoryComponent>(TEXT("PropInventory"));
 	ToolInventory = CreateDefaultSubobject<UToolInventoryComponent>(TEXT("ToolInventory"));
+	ArmsAnimation = CreateDefaultSubobject<UArmsAnimationComponent>(TEXT("ArmsAnimation"));
 }
 
 // ----------------------------------------------------------------------
@@ -72,6 +74,14 @@ void ASunsetCoveCharacter::PostInitializeComponents()
 		{
 			ToolInventory->RegisterWithInteraction(Interaction);
 		}
+	}
+
+	if (ArmsAnimation)
+	{
+		// The animation layer listens to both inventories (they do not know it) and animates the first-person arms.
+		ArmsAnimation->SetArmsMesh(FirstPersonMesh);
+		ArmsAnimation->BindToPropInventory(PropInventory);
+		ArmsAnimation->BindToToolInventory(ToolInventory);
 	}
 }
 

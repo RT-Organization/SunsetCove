@@ -296,7 +296,7 @@ All actions are owned by the component (`UInputAction` properties) and bound in 
 | `OnStateChanged(New, Old)` | menu opened / closed | show and hide the radial menu widget |
 | `OnRadialHoverChanged(SlotIndex)` | the sector under the look direction changed (-1 none) | highlight a sector |
 | `OnEquippedToolChanged(New, Old, Slot)` | the tool in the hand changed | update the HUD, swap the hand pose |
-| `OnToolAction(Action, Slot, Tool)` | Pickup, Equip, Holster, UseStarted, UseEnded, Drop | **the one-shot animation trigger** (play the arms montage for `Action`) |
+| `OnToolAction(Action, Slot, Tool)` | Pickup, Equip, Holster, UseStarted, UseEnded, Drop (the logical state has changed; the physical effect may follow, 7.5) | reactions and the Use animation. **To start the animation of Pickup, Equip, Holster or Drop use the `ActionBeginHook` (7.5)**: the arms animation system does |
 | `OnSlotsChanged()` | a slot was filled or emptied | rebuild the wheel icons |
 | `OnActionRefused(Reason, Tool)` | HandsBusy, InventoryFull, AlreadyOwned, ToolBlocked, NoTools | the message to the player |
 
@@ -313,11 +313,28 @@ All actions are owned by the component (`UInputAction` properties) and bound in 
 3. Highlight the sector of **On Radial Hover Changed**. Draw a cursor at `GetRadialVector`.
 4. Nothing to do on release: the component equips or holsters by itself. If the widget has its own mouse cursor, call `SetHoveredSlot(i)` instead of using the look input.
 
-### 7.4 How to add animations later
+### 7.4 Animations
 
-- **Arms montages:** assign **On Tool Action** on the character, *Switch on Action*, and call the framework's `Play Action Montages` with the montage for that action. The action has already taken effect when the event fires.
+- **Arms:** done by the arms animation system, `../../AnimationSystem/Architecture_Overview.md`. It starts the animation of Pickup, Equip, Holster and Drop from the `ActionBeginHook` (7.5), the Use animation from `OnToolAction(UseStarted / UseEnded)` and the hold pose from `OnEquippedToolChanged`. Nothing to wire.
 - **Tool-side animation:** `EquipAnimation` / `UseAnimation` (an asset played once on `ToolMesh`) or, for an Animation Blueprint on `ToolMesh`, the tool's Blueprint events.
 - **Hold poses:** the Animation Blueprint of the arms reads `IsToolEquipped`, `GetEquippedTool` and `IsUsingTool`.
+
+### 7.5 Commit timing: logical state now, physical effect when the animation says
+
+The slots and the equipped tool change the **instant the player acts**: a tool is equipped, holstered or dropped whatever an animation does. The **physical effect** can be delayed to a moment of an animation:
+
+| Action | Immediate part (logical) | Delayed part (physical) |
+|---|---|---|
+| Pickup | slot filled, collision off, `OnToolAction(Pickup)`, `OnSlotsChanged` | attach to the hand socket, hide, `NotifyPickedUp` |
+| Equip | `EquippedSlotIndex`, `OnToolAction(Equip)`, `OnEquippedToolChanged` | show the tool, `NotifyEquipped` |
+| Holster | `EquippedSlotIndex`, `OnToolAction(Holster)`, `OnEquippedToolChanged` | hide the tool, `NotifyHolstered` |
+| Drop | slot emptied, drop speed decided, `OnToolAction(Drop)`, `OnSlotsChanged` | `CommitDrop`: detach, wall-safety trace, show, launch, `NotifyDropped` |
+
+`UToolInventoryComponent::ActionBeginHook` (a C++ delegate) is called after the logical part and before the physical part; its listener starts an animation and returns an `FActionCommitTiming` (`Core/Utils/SunsetCoveActionCommit.h`): **Immediate**, **AfterDelay** or **OnNotify** (then `CommitPendingAction()` releases it, with a timeout as a safety net). **With no hook bound everything is immediate, exactly as before.**
+
+Rules: the tool cannot be used while its Equip is pending. A **swap** (Holster and Equip in one call), the **drop of the equipped tool** and **hands that become busy** hide the old tool at once and call no hook for it; only the new Equip is timed. With **auto-equip**, the first Pickup puts the tool in the hand at once and the Equip is the timed moment. A new action (`TryPickupTool`, `SetEquippedSlot`, `DropToolInSlot`) and `CancelCurrentAction` (also `EndPlay` and the unpossess) apply a pending effect at once; a tool destroyed while pending is skipped. `IsCommitPending()` says whether one is waiting. The timing of *Use* is not part of this (a natural next step with the same mechanism).
+
+**Future work (requested by the project owner):** the tool Pickup should not teleport either: the tool should travel toward the hand and attach when it arrives. The place is the physical pickup lambda in `TryPickupTool` (a `FUTURE:` comment marks it).
 
 ---
 

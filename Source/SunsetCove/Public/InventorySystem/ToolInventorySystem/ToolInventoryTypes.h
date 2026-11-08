@@ -6,6 +6,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/Utils/SunsetCoveActionCommit.h"
 #include "Engine/EngineTypes.h"
 #include "GameFramework/Actor.h"
 #include "ToolInventoryTypes.generated.h"
@@ -90,7 +91,17 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FToolRadialHoverChangedSignature, in
 /** The tool in the hand changed. NewTool is null when the tool was holstered, OldTool is null when the hand was empty. SlotIndex is the new slot, -1 if none. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FToolEquippedChangedSignature, ASunsetCoveTool*, NewTool, ASunsetCoveTool*, OldTool, int32, SlotIndex);
 
-/** Something happened to a tool. The hook for one-shot animations: play the montage for Action from here. */
+/**
+ * C++ hook, asked when Pickup, Equip, Holster or Drop is ACCEPTED (the slots and the equipped tool already changed) and BEFORE its
+ * physical effect (attach and hide, show, hide, detach). The listener starts its animation and answers with the commit timing of that
+ * action. See Core/Utils/SunsetCoveActionCommit.h.
+ */
+DECLARE_DELEGATE_RetVal_ThreeParams(FActionCommitTiming, FToolActionBeginHook, EToolAction, int32, ASunsetCoveTool*);
+
+/**
+ * Something happened to a tool (the logical state has changed; the physical effect may follow slightly later if an ActionBeginHook
+ * delays it). To START an animation of Pickup, Equip, Holster or Drop use the ActionBeginHook; UseStarted and UseEnded are for this event.
+ */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FToolActionSignature, EToolAction, Action, int32, SlotIndex, ASunsetCoveTool*, Tool);
 
 /** A slot was filled or emptied. */

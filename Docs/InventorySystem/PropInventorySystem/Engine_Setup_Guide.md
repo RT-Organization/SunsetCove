@@ -315,7 +315,7 @@ Prop Inventory component values are editable while playing (select the character
 - **Assign On State Changed**: show the widget when `New State = Charging Throw`, hide it otherwise.
 - **Assign On Throw Charge Changed**: set the bar percent to the float (0..1).
 
-**Arms animations (one-shots for the player).** **Assign On Prop Action**: *Switch on Action* (Grab / Place / Throw / Drop), then **Play Action Montages** (an existing function on the character) with the arms montage for that action. The action has already taken effect when the event fires; if the animation must delay it, that is a small change inside the component (see `Architecture_Overview.md`, 9.1). The Animation Blueprint of the arms can read `Get State`, `Is Holding Any Prop` and `Is Hand Occupied` to choose hold poses.
+**Arms animations.** Done by the arms animation system: see `../../AnimationSystem/Engine_Setup_Guide.md` (setup, the animator's files, the test checklist) and `../../AnimationSystem/Architecture_Overview.md`. It listens to this component and also decides *when* the prop attaches or detaches (`Architecture_Overview.md` of this system, section 9.5). Nothing to wire here.
 
 **Tools.** The Tool Inventory is a separate system (`../ToolInventorySystem/`). It is refused while `Is Holding Any Prop` is true: the character does that wiring, nothing to do here.
 

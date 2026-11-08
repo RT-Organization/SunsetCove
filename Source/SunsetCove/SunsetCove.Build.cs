@@ -25,7 +25,8 @@ public class SunsetCove : ModuleRules
 			"CoreFramework" 
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] {  });
+		// AssetRegistry: only the editor helper "Populate From Naming Convention" of the arms animation data asset uses it.
+		PrivateDependencyModuleNames.AddRange(new string[] { "AssetRegistry" });
 
 		// Expose custom subfolders so headers can be found cleanly
 		PublicIncludePaths.AddRange(new string[] 

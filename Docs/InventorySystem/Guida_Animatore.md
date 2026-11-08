@@ -1,4 +1,4 @@
-# Guida per l'Animatore — Prop, Strumenti e Braccia
+﻿# Guida per l'Animatore — Prop, Strumenti e Braccia
 
 **Progetto:** Sunset Cove  |  **Motore:** Unreal Engine 5.8  |  **Software:** Blender
 **Per chi è:** l'animatore. Non serve sapere programmare e non serve conoscere Unreal.
@@ -354,6 +354,91 @@ I file **B** sono opzionali e si possono aggiungere dopo senza cambiare niente n
 - Granchio preso con la mano sinistra e messo nel secchio (usa `Tool_L`): sarà una lista a parte quando decidiamo il gesto.
 - Sacco dei rifiuti: tolto per ora.
 - Animazioni del vento sui prop: non servono.
+
+### 9.7 Checklist completa di tutte le animazioni (da spuntare)
+
+Spunta ogni riga quando il file è **fatto ed esportato** nella cartella giusta. **A** = obbligatoria, **B** = facoltativa. Ogni animazione delle braccia ha una riga per la mano destra (`_R`) e una per la sinistra (`_L`), perché sono file separati.
+
+#### Braccia — Lettino (`Sunbed`) — 12 obbligatorie + 2 facoltative
+
+- [ ] `AS_Arms_Sunbed_Grab_R` — **A**
+- [ ] `AS_Arms_Sunbed_Grab_L` — **A**
+- [ ] `AS_Arms_Sunbed_Hold_R` — **A**
+- [ ] `AS_Arms_Sunbed_Hold_L` — **A**
+- [ ] `AS_Arms_Sunbed_Place_R` — **A**
+- [ ] `AS_Arms_Sunbed_Place_L` — **A**
+- [ ] `AS_Arms_Sunbed_ThrowCharge_R` — **A**
+- [ ] `AS_Arms_Sunbed_ThrowCharge_L` — **A**
+- [ ] `AS_Arms_Sunbed_Throw_R` — **A**
+- [ ] `AS_Arms_Sunbed_Throw_L` — **A**
+- [ ] `AS_Arms_Sunbed_Drop_R` — **A**
+- [ ] `AS_Arms_Sunbed_Drop_L` — **A**
+- [ ] `AS_Arms_Sunbed_PlaceAim_R` — **B**
+- [ ] `AS_Arms_Sunbed_PlaceAim_L` — **B**
+
+#### Braccia — Ombrellone (`Umbrella`) — 12 obbligatorie + 2 facoltative
+
+- [ ] `AS_Arms_Umbrella_Grab_R` — **A**
+- [ ] `AS_Arms_Umbrella_Grab_L` — **A**
+- [ ] `AS_Arms_Umbrella_Hold_R` — **A**
+- [ ] `AS_Arms_Umbrella_Hold_L` — **A**
+- [ ] `AS_Arms_Umbrella_Place_R` — **A**
+- [ ] `AS_Arms_Umbrella_Place_L` — **A**
+- [ ] `AS_Arms_Umbrella_ThrowCharge_R` — **A**
+- [ ] `AS_Arms_Umbrella_ThrowCharge_L` — **A**
+- [ ] `AS_Arms_Umbrella_Throw_R` — **A**
+- [ ] `AS_Arms_Umbrella_Throw_L` — **A**
+- [ ] `AS_Arms_Umbrella_Drop_R` — **A**
+- [ ] `AS_Arms_Umbrella_Drop_L` — **A**
+- [ ] `AS_Arms_Umbrella_PlaceAim_R` — **B**
+- [ ] `AS_Arms_Umbrella_PlaceAim_L` — **B**
+
+#### Braccia — Secchio (`Bucket`), solo mano destra — 4 obbligatorie + 2 facoltative
+
+- [ ] `AS_Arms_Bucket_Equip_R` — **A**
+- [ ] `AS_Arms_Bucket_Holster_R` — **A**
+- [ ] `AS_Arms_Bucket_Hold_R` — **A**
+- [ ] `AS_Arms_Bucket_Use_R` — **A**
+- [ ] `AS_Arms_Bucket_Pickup_R` — **B**
+- [ ] `AS_Arms_Bucket_Drop_R` — **B**
+
+#### Braccia — Spray (`Spray`), solo mano destra — 4 obbligatorie + 2 facoltative
+
+- [ ] `AS_Arms_Spray_Equip_R` — **A**
+- [ ] `AS_Arms_Spray_Holster_R` — **A**
+- [ ] `AS_Arms_Spray_Hold_R` — **A**
+- [ ] `AS_Arms_Spray_Use_R` (Loop) — **A**
+- [ ] `AS_Arms_Spray_Pickup_R` — **B**
+- [ ] `AS_Arms_Spray_Drop_R` — **B**
+
+#### Braccia — Giocattolo (`Toy`), solo mano destra — 4 obbligatorie + 2 facoltative
+
+- [ ] `AS_Arms_Toy_Equip_R` — **A**
+- [ ] `AS_Arms_Toy_Holster_R` — **A**
+- [ ] `AS_Arms_Toy_Hold_R` — **A**
+- [ ] `AS_Arms_Toy_Use_R` — **A**
+- [ ] `AS_Arms_Toy_Pickup_R` — **B**
+- [ ] `AS_Arms_Toy_Drop_R` — **B**
+
+#### Braccia — Menu radiale (generiche) — facoltative
+
+- [ ] `AS_Arms_ToolMenu_Open_R` — **B**
+- [ ] `AS_Arms_ToolMenu_Close_R` — **B**
+
+#### Dell'oggetto (sul suo scheletro)
+
+- [ ] `AS_Sunbed_Close` — **A**
+- [ ] `AS_Sunbed_Open` — **A**
+- [ ] `AS_Umbrella_Close` — **A**
+- [ ] `AS_Umbrella_Open` — **A**
+- [ ] `AS_Bucket_Equip` — **B**
+- [ ] `AS_Bucket_Use` — **B**
+- [ ] `AS_Spray_Equip` — **B**
+- [ ] `AS_Spray_Use` — **B**
+- [ ] `AS_Toy_Equip` — **B**
+- [ ] `AS_Toy_Use` — **B**
+
+**Totale obbligatorie (A): 40** (24 braccia prop + 12 braccia strumenti + 4 oggetto). **Facoltative (B): 18** (4 `PlaceAim`, 6 `Pickup`/`Drop` degli strumenti, 2 menu radiale, 6 dell'oggetto).
 
 ---
 
