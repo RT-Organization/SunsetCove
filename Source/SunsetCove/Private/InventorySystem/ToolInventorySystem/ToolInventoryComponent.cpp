@@ -22,7 +22,7 @@ namespace
 
 	constexpr int32 MaxSlotCount = 8;
 
-	bool HasPhysics(ECollisionEnabled::Type Collision)
+	bool ToolCollisionHasPhysics(ECollisionEnabled::Type Collision)
 	{
 		return Collision == ECollisionEnabled::QueryAndPhysics || Collision == ECollisionEnabled::PhysicsOnly;
 	}
@@ -723,7 +723,7 @@ bool UToolInventoryComponent::DropToolInSlot(int32 SlotIndex)
 		const FVector LinearVelocity = Forward * DropForwardSpeed + FVector::UpVector * DropUpSpeed + OwnerVelocity * InheritOwnerVelocityScale;
 
 		// A dropped tool must fall: it needs collision WITH physics, whatever it had before it was picked up.
-		Primitive->SetCollisionEnabled(HasPhysics(SavedCollision) ? SavedCollision : ECollisionEnabled::QueryAndPhysics);
+		Primitive->SetCollisionEnabled(ToolCollisionHasPhysics(SavedCollision) ? SavedCollision : ECollisionEnabled::QueryAndPhysics);
 		ApplyTemporaryPawnIgnore(Primitive);
 		Primitive->SetSimulatePhysics(true);
 		Primitive->WakeRigidBody();

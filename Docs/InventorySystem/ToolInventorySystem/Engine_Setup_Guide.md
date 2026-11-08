@@ -2,6 +2,7 @@
 
 **Project:** Sunset Cove  |  **Engine:** Unreal Engine 5.8  |  **Systems:** `UToolInventoryComponent`, `ASunsetCoveTool`, `UInteractionComponent`
 **Audience:** whoever sets the system up in the editor and tests it (no C++ needed), and the animator (section 2).
+**Per l'animatore (in italiano):** `../Guida_Animatore.md`.
 **Companion documents:** `Architecture_Overview.md` (how it works inside), `../PropInventorySystem/Engine_Setup_Guide.md` (the props: **do that guide first**, this one builds on it), `../../InteractionSystem/Interaction_System.md`.
 
 ---
@@ -52,29 +53,30 @@ Same rule as for props: everything that connects an object to the hand is made i
 
 | In Blender | Name | Notes |
 |---|---|---|
-| a **bone** or a **socket** on the right hand | `Tool_R` | **optional.** Where a tool is held. If the arms have no `Tool_R`, tools are held on **`Prop_R`** (the prop socket) |
+| a **bone** or a **socket** on the right hand | `Tool_R` | **required.** Where a tool is held in the right hand. (If it is missing the code falls back to `Prop_R`, only so it can be tested before the arms are ready) |
+| a **bone** or a **socket** on the left hand | `Tool_L` | **required, for the future**: the left hand takes things that go into a tool (for example a crab that is then put in the bucket). Nothing in the code uses it yet |
 
-- You do **not** need anything new to start: with only `Prop_R` on the arms, tools are held there (one log line says so).
-- Add `Tool_R` when a tool should be held differently from a prop (a different palm position). Same rules as `Prop_R` (see the prop guide, 2.1): a bone is the safest choice; a Blender socket is an Empty named `SOCKET_Tool_R`.
+- To test before the arms are ready: with only `Prop_R` on the arms, tools are held there (one log line says so).
+- `Tool_R` is where the palm holds a tool (it can differ from `Prop_R`). Same rules as `Prop_R` (see the prop guide, 2.1): a bone is the safest choice; a Blender socket is an Empty named `SOCKET_Tool_R`.
 - To use other names: `BP_Character` > **Tool Inventory** > `ToolInventory|Hand` > **Tool Socket Name** / **Fallback Tool Socket Name**.
 
 ### 2.2 Every tool
 
 | In Blender | Name | Notes |
 |---|---|---|
-| a **bone** (or a socket) of the tool's skeleton | `Grip` | the point and orientation by which the hand holds the tool |
+| a **bone** (or a socket) of the tool's skeleton | `Grip_R` | the point and orientation by which the hand holds the tool |
 
-- **Align it like the hand socket**: the system places the tool so its `Grip` has the same position **and orientation** as `Tool_R` / `Prop_R`. If both are built with the same convention, the tool sits right with no offset.
+- **Align it like the hand socket**: the system places the tool so its `Grip_R` has the same position **and orientation** as `Tool_R` / `Prop_R`. If both are built with the same convention, the tool sits right with no offset.
 - **Keep the grip still in the tool's animations** (a bone child of the root that is never keyed). It is read at the moment the tool is picked up.
 - Other bones are free (the lid of the spray, the handle of the bucket).
-- If the bone is not called `Grip`: Blueprint > Class Defaults > **Tool|Grip > Grip Socket Name**.
+- If the bone is not called `Grip_R`: Blueprint > Class Defaults > **Tool|Grip > Grip Socket Name**.
 
 ### 2.3 Check it quickly
 
-Open the imported skeleton > **Skeleton Tree**: `Grip` on the tool, `Tool_R` or `Prop_R` on the arms. If something is missing the Output Log says so at Play (filter `LogSunsetCove`):
+Open the imported skeleton > **Skeleton Tree**: `Grip_R` on the tool, `Tool_R` or `Prop_R` on the arms. If something is missing the Output Log says so at Play (filter `LogSunsetCove`):
 
 - arms: *ToolInventory: socket or bone 'Tool_R' not found on 'FirstPersonMesh', so tools are held on 'Prop_R'...* (fine) or *neither 'Tool_R' nor 'Prop_R' was found...* (fix it)
-- tool: *Tool 'BP_X': grip bone or socket 'Grip' does not exist on skeleton of 'SK_X'...*
+- tool: *Tool 'BP_X': grip bone or socket 'Grip_R' does not exist on skeleton of 'SK_X'...*
 
 ### While the Blender work is not ready yet
 
@@ -132,7 +134,7 @@ If an action is left empty, the Output Log shows one warning at the start of Pla
 ## 6. Making a tool (one Blueprint, one mesh)
 
 1. Content Browser > right-click > **Blueprint Class** > in *All Classes* search **Sunset Cove Tool** > create, for example `BP_Bucket` in `Content/Gameplay/Tools/`.
-2. Open it. In the **Components** panel select **ToolMesh** and, in Details > **Mesh** > **Skeletal Mesh Asset**, pick the tool's skeletal mesh (the one with the `Grip` bone).
+2. Open it. In the **Components** panel select **ToolMesh** and, in Details > **Mesh** > **Skeletal Mesh Asset**, pick the tool's skeletal mesh (the one with the `Grip_R` bone).
 3. **Class Defaults** > **Tool|Identity**: set **Tool Id** (the row name of the tool in the "Strumenti" table, for example `Bucket`; it must be **unique per tool**), **Display Name** (for the future menu) and **Icon** (optional for now).
 4. Compile and save. **That is all.** The Blueprint already has:
 
@@ -140,7 +142,7 @@ If an action is left empty, the Output Log shows one warning at the start of Pla
 |---|---|
 | a **collision box as the root**, Movable, `PhysicsActor` preset (the interaction trace hits it; it can fall when dropped) | yes |
 | the box **sized to the mesh** and the mesh centered in it | yes (`Auto Fit Collision To Mesh`) |
-| the grip: the `Grip` bone aligned to the hand socket | yes |
+| the grip: the `Grip_R` bone aligned to the hand socket | yes |
 | pickup, storing, showing in the hand, use, drop | yes |
 
 Drop it in the level (**do not move ToolMesh in the viewport**). A tool in the level is solid and stays put until picked up. In the game, other systems will spawn tools at the visitors' spots; for testing, place a few by hand.
@@ -151,7 +153,7 @@ Drop it in the level (**do not move ToolMesh in the viewport**). A tool in the l
 |---|---|---|---|
 | `Tool\|Identity` | `Tool Id` | none | unique id; two tools with the same id are the same tool (a second one is refused) |
 | | `Display Name`, `Icon` | empty | what the radial menu will show |
-| `Tool\|Grip` | `Grip Socket Name` | `Grip` | bone / socket held by the hand |
+| `Tool\|Grip` | `Grip Socket Name` | `Grip_R` | bone / socket held by the hand |
 | | `Hold Location / Rotation Offset` | 0 | a nudge relative to the hand socket |
 | `Tool\|Use` | `Use Mode` | Press | **Press**: one use per click. **Hold**: repeats while the button is held (spray) |
 | | `Use Cooldown Seconds` | 0.4 | minimum time between two uses |
@@ -230,7 +232,7 @@ Put in the level: two different tools (for example `BP_Bucket` with `Tool Id = B
 | E does not pick the tool up | it is not an *ASunsetCoveTool* (the Blueprint parent is wrong), the box does not block `Visibility`, out of `Interaction Range`, or the hands hold props / the inventory is full (a refusal is reported) |
 | The tool is picked up but you see nothing | it is hidden because it is stored, not equipped: choose it in the menu. Or the Skeletal Mesh Asset is not set (a warning says so) |
 | The tool floats in front of the arms, not in the hand | neither `Tool_R` nor `Prop_R` exists on the arms (a warning says so): it is at the fallback offset |
-| The tool sits wrong in the hand | the `Grip` bone and the hand socket do not share the same axes, or the grip is animated. Quick fix: **Hold Location / Rotation Offset** on the tool |
+| The tool sits wrong in the hand | the `Grip_R` bone and the hand socket do not share the same axes, or the grip is animated. Quick fix: **Hold Location / Rotation Offset** on the tool |
 | Moving the mouse up selects the bottom sector | turn on **Invert Radial Y** |
 | The wheel selects with the slightest movement / never | tune **Radial Radius** and **Radial Dead Zone** |
 | The wheel selects an empty sector | an empty sector selects nothing; release on it = hands free |

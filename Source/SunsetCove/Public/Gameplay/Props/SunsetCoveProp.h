@@ -94,11 +94,11 @@ public:
 	 * animator in Blender. Used for the right hand, and for the left hand too unless LeftGripSocketName is set.
 	 */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Prop|Grip")
-	FName GripSocketName = TEXT("Grip");
+	FName GripSocketName = TEXT("Grip_R");
 
-	/** Optional grip for the left hand (a prop that is held differently). Empty, or not found: GripSocketName is used. */
+	/** Grip for the left hand (a prop that is held differently). Empty, or not found on the skeleton: GripSocketName is used. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Prop|Grip")
-	FName LeftGripSocketName = NAME_None;
+	FName LeftGripSocketName = TEXT("Grip_L");
 
 	/** Fine tune: moves the prop relative to the hand socket (cm), on top of the grip alignment. Zero when the grip is right. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Prop|Grip", meta = (Units = "cm"))

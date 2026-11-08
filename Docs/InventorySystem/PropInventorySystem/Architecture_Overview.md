@@ -180,7 +180,7 @@ Two slots, index 0 = right hand, 1 = left hand (`FPropSlot`: the prop, a grab se
 | `PropMesh` (`USkeletalMeshComponent`, child) | The visible, animatable skeleton. **No collision.** Rigid physics on the box moves it as one solid object: a skeleton never ragdolls on a throw. |
 
 - **Auto fit** (`bAutoFitCollisionToMesh`, default on): in `OnConstruction` (so also in the Blueprint viewport) the box is sized from the mesh bounds (`+ CollisionPadding`) and the mesh is moved until its center is on the root. Reason: the root is the center of the box, and the center of the box is the pivot of the physics. The bounds come from the reference pose, brought into root space with the mesh's relative rotation and scale. Off: use `CollisionBoxExtent` and place the mesh by hand.
-- **Grip** (`GripSocketName`, default `Grip`; optional `LeftGripSocketName`): a bone or socket of the prop skeleton, made by the animator in Blender. `GetGripTransformInRoot` reads it with `GetSocketTransform(..., RTS_Actor)` (the actor space is the root's, location and rotation only). Missing grip: identity (the root center is held) and one warning at `BeginPlay`. The left hand uses `LeftGripSocketName` if it exists, otherwise the same grip.
+- **Grip** (`GripSocketName`, default `Grip_R`; optional `LeftGripSocketName`): a bone or socket of the prop skeleton, made by the animator in Blender. `GetGripTransformInRoot` reads it with `GetSocketTransform(..., RTS_Actor)` (the actor space is the root's, location and rotation only). Missing grip: identity (the root center is held) and one warning at `BeginPlay`. The left hand uses `LeftGripSocketName` if it exists, otherwise the same grip.
 - **Fine tune** (`HoldLocationOffset`, `HoldRotationOffset`): applied in the space of the hand socket on top of the grip alignment. Zero when the Blender grip is right.
 - **Animation**: `PickedUpAnimation` / `PlacedAnimation` (optional `UAnimationAsset`, played once with `PlayAnimation`, so they use single-node mode and replace an Animation Blueprint on the mesh), and the Blueprint events `BP_OnGrabbed / Dropped / Placed / Thrown` (display names *On Grabbed*...) for Animation-Blueprint-driven props.
 - **Physics**: `MassKg` (applied in `OnConstruction`), `bStartSimulatingPhysics` (applied in `BeginPlay`, default off: a prop in the level is solid until grabbed). `bCanBePickedUp` backs `IsPickupBlocked`.
@@ -367,7 +367,7 @@ Untouched. Used as-is: `ABaseCharacter::FirstPersonMesh` (hand mesh), the manage
 
 | Goal | How |
 |---|---|
-| A new carriable object | A Blueprint child of `ASunsetCoveProp`, set the skeletal mesh (Blender provides the `Grip` bone). No C++. |
+| A new carriable object | A Blueprint child of `ASunsetCoveProp`, set the skeletal mesh (Blender provides the `Grip_R` bone). No C++. |
 | A prop family with shared rules | A C++ or Blueprint child of `ASunsetCoveProp` (for example a base for sunbeds) and children of that. |
 | A rule for where a prop may go | Implement `IsPlacementBlocked` on the prop (Blueprint or C++). |
 | Prop-side reactions (sound, particles) | Implement `OnPropGrabbed / Dropped / Placed / Thrown` on the prop. |

@@ -2,11 +2,12 @@
 
 **Project:** Sunset Cove  |  **Engine:** Unreal Engine 5.8  |  **Systems:** `UPropInventoryComponent`, `UInteractionComponent`, `ASunsetCoveProp`
 **Revision 2.** **Audience:** whoever sets the system up in the editor and tests it (no C++ needed), and the animator (section 2).
+**Per l'animatore (in italiano):** `../Guida_Animatore.md`.
 **Companion documents:** `Architecture_Overview.md` (how it works inside), `../../InteractionSystem/Interaction_System.md`, `../ToolInventorySystem/Engine_Setup_Guide.md` (the tools; it shares the left mouse and Drop actions with this system).
 
 > **What changed in this revision (2)**
 > - New base class **`ASunsetCoveProp`**: a prop is now a Blueprint child of it. The collision root, the physics, the skeletal mesh component, the grip and the interface are all built in C++. Nothing to restructure, no sockets to add in Unreal, no interface to implement (section 7).
-> - **Sockets come from Blender.** The hand sockets (`Prop_R`, `Prop_L`) on the arms and the grip bone (`Grip`) on every prop are made by the animator and arrive with the FBX. Nothing is added by hand in Unreal any more (sections 2 and 7).
+> - **Sockets come from Blender.** The hand sockets (`Prop_R`, `Prop_L`) on the arms and the grip bone (`Grip_R`) on every prop are made by the animator and arrive with the FBX. Nothing is added by hand in Unreal any more (sections 2 and 7).
 > - The prop is placed so its grip bone lands exactly on the hand socket: no hand-tuned offsets.
 > - The hologram copies skeletal meshes too.
 
@@ -62,7 +63,7 @@ Everything that connects a prop to the hand is made in Blender and imported with
 
 - **A bone is the safest choice**: a bone child of the hand bone, named `Prop_R`, works with no import settings. A bone **or** a socket both work, the code uses whichever it finds by that name.
 - A **socket** in Blender is an Empty parented to the hand bone, named with the prefix `SOCKET_` (for example `SOCKET_Prop_R`). Unreal strips the prefix on import and the socket is named `Prop_R`.
-- Place it where the palm holds an object and give it the orientation you want a held prop to have. **The prop's `Grip` bone (2.2) will be aligned to it axis for axis.**
+- Place it where the palm holds an object and give it the orientation you want a held prop to have. **The prop's `Grip_R` bone (2.2) will be aligned to it axis for axis.**
 - When the arms are exported again, re-import over the existing arms mesh: the sockets and bones of the new file are the ones used. There is nothing to redo in Unreal, and **do not add sockets by hand in the skeleton any more**: the ones in the FBX are the truth.
 - If the animator prefers other names, change them on the component: `BP_Character` > **Prop Inventory** > `PropInventory|Hands` > **Right / Left Hand Socket Name**.
 
@@ -70,20 +71,20 @@ Everything that connects a prop to the hand is made in Blender and imported with
 
 | In Blender | Name | Notes |
 |---|---|---|
-| a **bone** (or a socket) of the prop's skeleton | `Grip` | the point and orientation by which the hand holds the prop |
-| (optional) a second one | e.g. `Grip_L` | only if the left hand must hold it differently; set it in **Prop|Grip > Left Grip Socket Name** |
+| a **bone** (or a socket) of the prop's skeleton | `Grip_R` | the point and orientation by which the hand holds the prop |
+| (optional) a second one | `Grip_L` | only if the left hand must hold it differently (default name of the left grip); set it in **Prop|Grip > Left Grip Socket Name** |
 
-- **Align it like the hand socket.** The system puts the prop so that its `Grip` has the same position **and orientation** as `Prop_R` / `Prop_L`. If the animator builds both from the same convention (for example, both with the Y axis along the fingers), a prop sits right in the hand with no offset at all.
+- **Align it like the hand socket.** The system puts the prop so that its `Grip_R` has the same position **and orientation** as `Prop_R` / `Prop_L`. If the animator builds both from the same convention (for example, both with the Y axis along the fingers), a prop sits right in the hand with no offset at all.
 - **The grip should not move in the prop's animations** (or only rest where it is held). The system reads the position of the bone at the moment the prop is grabbed. A good habit: make the grip a child of the root bone that is never keyed.
 - The prop's skeleton can contain any other bones the animations need (the umbrella's ribs, the sunbed's legs).
-- If the bone is not called `Grip`, change it per prop: Blueprint > Class Defaults > **Prop|Grip > Grip Socket Name**.
+- If the bone is not called `Grip_R`, change it per prop: Blueprint > Class Defaults > **Prop|Grip > Grip Socket Name**.
 
 ### 2.3 Check it quickly
 
-Open the imported skeleton, expand the **Skeleton Tree**: you should see `Prop_R` and `Prop_L` (arms) or `Grip` (prop), as bones or with the socket icon. If one is missing the Output Log says so at Play (filter `LogSunsetCove`):
+Open the imported skeleton, expand the **Skeleton Tree**: you should see `Prop_R` and `Prop_L` (arms) or `Grip_R` (prop), as bones or with the socket icon. If one is missing the Output Log says so at Play (filter `LogSunsetCove`):
 
 - arms: *PropInventory: hand socket(s) or bone(s) [Prop_R, Prop_L] not found on 'FirstPersonMesh'...*
-- prop: *Prop 'BP_X': grip bone or socket 'Grip' does not exist on skeleton of 'SK_X'...*
+- prop: *Prop 'BP_X': grip bone or socket 'Grip_R' does not exist on skeleton of 'SK_X'...*
 
 ### While the Blender work is not ready yet
 
@@ -179,7 +180,7 @@ If you name the parameter differently, set **Hologram Color Parameter Name** to 
 ## 7. Making a prop (one Blueprint, one mesh)
 
 1. Content Browser > right-click > **Blueprint Class** > in *All Classes* search **Sunset Cove Prop** > create, for example `BP_Sunbed` in `Content/Gameplay/Props/`.
-2. Open it. In the **Components** panel select **PropMesh** and, in Details > **Mesh** > **Skeletal Mesh Asset**, pick the prop's skeletal mesh (the one with the `Grip` bone).
+2. Open it. In the **Components** panel select **PropMesh** and, in Details > **Mesh** > **Skeletal Mesh Asset**, pick the prop's skeletal mesh (the one with the `Grip_R` bone).
 3. Compile and save. **That is all.** The Blueprint already has:
 
 | What | Done by C++ |
@@ -187,7 +188,7 @@ If you name the parameter differently, set **Hologram Color Parameter Name** to 
 | a **collision box as the root**, Movable, with the `PhysicsActor` collision preset (blocks the interaction trace and the world) | yes |
 | the box **sized to the mesh** and the mesh centered in it (in the viewport you see the box wrap the mesh) | yes (`Auto Fit Collision To Mesh`) |
 | the mass | yes (`Mass Kg`, default 10) |
-| the grip: the `Grip` bone is aligned to the hand socket when carried | yes |
+| the grip: the `Grip_R` bone is aligned to the hand socket when carried | yes |
 | the Prop Interface (grab, place, throw, drop, hologram) | yes |
 | the hologram: a copy of the skeletal mesh, in its current pose | yes |
 
@@ -197,7 +198,7 @@ Then drop it in the level (**do not move PropMesh in the viewport**: with Auto F
 
 | Category | Property | Default | What for |
 |---|---|---|---|
-| `Prop\|Grip` | `Grip Socket Name` | `Grip` | bone / socket of the prop skeleton held by the hand (right hand, and left unless the next one is set) |
+| `Prop\|Grip` | `Grip Socket Name` | `Grip_R` | bone / socket of the prop skeleton held by the hand (right hand, and left unless the next one is set) |
 | | `Left Grip Socket Name` | none | a different grip for the left hand (optional) |
 | | `Hold Location Offset`, `Hold Rotation Offset` | 0 | a nudge relative to the hand socket, without going back to Blender |
 | `Prop\|Collision` | `Auto Fit Collision To Mesh` | on | box from the mesh bounds; mesh centered in it |
@@ -237,7 +238,7 @@ Put two props in a test level, press Play.
 
 | # | Do | Expect |
 |---|---|---|
-| 1 | Look at a prop within ~2.5 m, press **E** | it jumps to the right hand, `Grip` on `Prop_R` |
+| 1 | Look at a prop within ~2.5 m, press **E** | it jumps to the right hand, `Grip_R` on `Prop_R` |
 | 2 | Look at a second prop, press **E** | it jumps to the left hand |
 | 3 | Look at a third prop, press **E** | nothing (hands full) |
 | 4 | Hold **left mouse** | hologram of the **second** prop (last grabbed) follows the view, green on flat ground |
@@ -291,9 +292,9 @@ Prop Inventory component values are editable while playing (select the character
 | Nothing happens on **E**, no log | `IA_Interact` not set, or not in the mapping context | sections 3-5. Warning *'Interaction: ... has no Interact Action'* confirms it |
 | Aiming at the prop does not focus it (Draw Debug on the Interaction component shows orange or red) | the prop is not a `Sunset Cove Prop` and has no Prop Interface, or does not block Visibility, or is out of range | make it a child of `Sunset Cove Prop` (section 7) |
 | *'Prop X has no Skeletal Mesh Asset on its PropMesh component'* | mesh not set | section 7, step 2 |
-| *'Prop X: grip bone or socket 'Grip' does not exist on skeleton of ...'* | the skeleton has no bone with that name | the animator adds it in Blender (section 2.2), or set `Grip Socket Name` to a bone that exists |
+| *'Prop X: grip bone or socket 'Grip_R' does not exist on skeleton of ...'* | the skeleton has no bone with that name | the animator adds it in Blender (section 2.2), or set `Grip Socket Name` to a bone that exists |
 | *'PropInventory: hand socket(s) or bone(s) [...] not found on 'FirstPersonMesh''* | the arms mesh has no `Prop_R` / `Prop_L`, or the arms have no skeletal mesh asset, or the names differ | section 2.1; or fix the names in `PropInventory|Hands` |
-| The prop is in the hand but turned or offset wrongly | the `Grip` bone and the hand socket have different axes in Blender | align them in Blender (section 2), or nudge with the prop's `Hold Location / Rotation Offset` |
+| The prop is in the hand but turned or offset wrongly | the `Grip_R` bone and the hand socket have different axes in Blender | align them in Blender (section 2), or nudge with the prop's `Hold Location / Rotation Offset` |
 | The prop jumps when grabbed after being placed | the grip bone moves in the placed animation | keep the grip unkeyed (section 2.2) |
 | Warning *'no Hologram Material'* | optional material missing | section 6 |
 | Hologram looks like a gray grid | the hologram material lacks *Used with Skeletal Meshes* | section 6, step 3 |
@@ -323,4 +324,4 @@ Prop Inventory component values are editable while playing (select the character
 ## 12. What was and was not verified
 
 - The C++ of the systems and of `ASunsetCoveProp` was written against the UE 5.8 headers and built with the Development Editor target (see the build result in the hand-over notes).
-- **Not run in the editor** by the author: how a real `Grip` bone and `Prop_R` socket line up with your Blender rig, hologram appearance, throw feel, placement obstacle detection on your actual beach geometry, and the Auto Fit box on your real meshes. Walk through section 8.1 once with a real prop and tune with section 9.
+- **Not run in the editor** by the author: how a real `Grip_R` bone and `Prop_R` socket line up with your Blender rig, hologram appearance, throw feel, placement obstacle detection on your actual beach geometry, and the Auto Fit box on your real meshes. Walk through section 8.1 once with a real prop and tune with section 9.

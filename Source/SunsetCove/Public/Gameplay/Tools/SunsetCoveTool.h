@@ -24,7 +24,7 @@
 //   ToolMesh               The skeletal mesh (visual only, no collision). Tools may animate, like props do.
 //
 // THE GRIP (how the tool sits in the hand)
-//   GripSocketName names a bone (or a socket) of the tool's skeleton, created by the animator in Blender (default "Grip").
+//   GripSocketName names a bone (or a socket) of the tool's skeleton, created by the animator in Blender (default "Grip_R").
 //   When the tool is picked up, the system places the tool so that THIS bone lands exactly on the hand socket of the arms
 //   (Tool_R, or Prop_R when the arms have no Tool_R). HoldLocationOffset / HoldRotationOffset are a small per-tool fine tune
 //   on top of it. Without a grip bone the center of the tool is placed on the hand socket, and one warning says so.
@@ -124,7 +124,7 @@ public:
 
 	/** Bone or socket of the tool's skeleton that is placed on the hand socket when the tool is carried. Created by the animator in Blender. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tool|Grip")
-	FName GripSocketName = TEXT("Grip");
+	FName GripSocketName = TEXT("Grip_R");
 
 	/** Fine tune: moves the tool relative to the hand socket (cm), on top of the grip alignment. Zero when the grip is right. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tool|Grip", meta = (Units = "cm"))

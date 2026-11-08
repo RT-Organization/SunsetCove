@@ -147,7 +147,7 @@ The tool counterpart of `ASunsetCoveProp`: **create a Blueprint whose parent is 
 | `CollisionBody` (root) | An invisible `UBoxComponent`, Movable, `PhysicsActor` preset. The interaction trace hits it (so the player can aim at the tool) and it is what falls when the tool is dropped. Auto-fitted to the mesh bounds. |
 | `ToolMesh` | The skeletal mesh, a child of the box, **no collision**. Tools animate like props, so they are skeletal meshes built in Blender. |
 | Identity | `ToolId` (`FName`, the row name in the tools table; two tools with the same id are the same tool), `DisplayName` (`FText`), `Icon` (soft texture) — what the radial menu widget needs. |
-| Grip | `GripSocketName` (default `Grip`): the bone of the tool's skeleton that lands on the hand socket. `HoldLocationOffset` / `HoldRotationOffset`: a small fine tune on top. |
+| Grip | `GripSocketName` (default `Grip_R`): the bone of the tool's skeleton that lands on the hand socket. `HoldLocationOffset` / `HoldRotationOffset`: a small fine tune on top. |
 | Use rules | `UseMode` (`Press` or `Hold`), `UseCooldownSeconds`, `HoldUseInterval`, `UseRange`, `UseTraceRadius`, `UseTraceChannel`, `bRequiresTarget`. |
 | Other | `bCanBePickedUp`, `MassKg`, `bStartSimulatingPhysics`, optional `EquipAnimation` / `UseAnimation`. |
 
@@ -178,7 +178,7 @@ FindUseTarget: a sphere sweep from the player's view (UseRange, UseTraceRadius).
 
 `PerformUse` and `IsUseBlocked` are `BlueprintNativeEvent`s, so a tool Blueprint can override them as well as a C++ subclass.
 
-**The grip.** The animator puts a `Grip` bone on the tool and a hand socket on the arms, in Blender. The system attaches the tool by its root (the box) at the transform `RootInHandSocket = GripInRoot⁻¹ · FineTune`, so the grip lands exactly on the hand socket. This math is in `SunsetCoveHeldItemUtils.h` and is the same one props use (`ASunsetCoveProp` was changed to call it; behavior unchanged).
+**The grip.** The animator puts a `Grip_R` bone on the tool and a hand socket on the arms, in Blender. The system attaches the tool by its root (the box) at the transform `RootInHandSocket = GripInRoot⁻¹ · FineTune`, so the grip lands exactly on the hand socket. This math is in `SunsetCoveHeldItemUtils.h` and is the same one props use (`ASunsetCoveProp` was changed to call it; behavior unchanged).
 
 ### 4.2 `IToolTargetInterface` — what a tool is used ON
 
@@ -336,7 +336,7 @@ All actions are owned by the component (`UInputAction` properties) and bound in 
 
 ## 9. Extending the system
 
-**A new tool** (for example a net): Blueprint child of `Sunset Cove Tool`; set the mesh, `ToolId`, `DisplayName`, `Icon`, `UseMode`, `UseRange`. Add a `Grip` bone in Blender. If its effect is only "tell the target", nothing else is needed.
+**A new tool** (for example a net): Blueprint child of `Sunset Cove Tool`; set the mesh, `ToolId`, `DisplayName`, `Icon`, `UseMode`, `UseRange`. Add a `Grip_R` bone in Blender. If its effect is only "tell the target", nothing else is needed.
 
 **A tool with its own effect** (the spray particle): override `PerformUse` in a Blueprint, or derive a C++ class from `ASunsetCoveTool` and override `PerformUse_Implementation`. Use `bRequiresTarget = false` for effects that work on empty air.
 
