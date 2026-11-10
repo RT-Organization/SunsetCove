@@ -8,6 +8,46 @@
 		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
 	},
 	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\AudioSystem\\Components\\AudioEmitterComponent.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\AudioSystem\\Core\\AudioGameplayTags.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\AudioSystem\\Library\\AudioFunctionLibrary.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\AudioSystem\\Manager\\AudioFrameSubsystem.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\AudioSystem\\Notifies\\AnimNotify_PlayAudioCue.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\CameraSystem\\CameraManagerComponent.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
@@ -41,6 +81,102 @@
 	},
 	{
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\Movement\\BaseCharacterMovementComponent.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\Components\\SaveableComponent.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\Core\\SaveSerialization.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\Data\\SaveHooks.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\Data\\SaveMigrationStep.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\Data\\SaveSlotData.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\Library\\SaveFunctionLibrary.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\Manager\\SaveSubsystem.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\Manager\\SaveSubsystem_Operations.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\Manager\\SaveSubsystem_Registry.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\UI\\SaveProfileTabWidget.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\UI\\SaveSlotEntryWidget.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Plugins\\CoreFramework\\Source\\CoreFramework\\Private\\SaveSystem\\UI\\SaveSlotsTabWidget.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
 			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\CoreFramework.0.rsp"
@@ -145,6 +281,38 @@
 	},
 	{
 		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Source\\SunsetCove\\Private\\AI\\SunsetCoveAIController.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\SunsetCove.1.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Source\\SunsetCove\\Private\\AnimationSystem\\ArmsAnimation\\AnimNotify_ArmsItemCommit.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\SunsetCove.1.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Source\\SunsetCove\\Private\\AnimationSystem\\ArmsAnimation\\ArmsAnimInstance.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\SunsetCove.1.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Source\\SunsetCove\\Private\\AnimationSystem\\ArmsAnimation\\ArmsAnimationComponent.cpp",
+		"arguments": [
+			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
+			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\SunsetCove.1.rsp"
+		],
+		"directory": "C:\\Program Files\\Epic Games\\UE_5.8\\Engine\\Source"
+	},
+	{
+		"file": "D:\\GitHub\\Unreal\\SunsetCove\\Source\\SunsetCove\\Private\\AnimationSystem\\ArmsAnimation\\ArmsAnimationSet.cpp",
 		"arguments": [
 			"C:\\Program Files\\Microsoft Visual Studio\\2022\\Community\\VC\\Tools\\MSVC\\14.44.35207\\bin\\Hostx64\\x64\\cl.exe",
 			"@D:\\GitHub\\Unreal\\SunsetCove\\.vscode\\compileCommands_SunsetCove\\SunsetCove.1.rsp"
