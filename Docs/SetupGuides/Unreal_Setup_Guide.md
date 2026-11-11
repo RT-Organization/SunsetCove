@@ -18,6 +18,8 @@
 | 5 | [Is anything global touched? (project settings)](#5-is-anything-global-touched-project-settings) | quick answer: "do I need to change a setting?" |
 | 6 | [Troubleshooting quick table](#6-troubleshooting-quick-table) | something does not work |
 | 7 | [Template for new chapters](#7-template-for-new-chapters) | adding a new kind of thing to this guide |
+| 8 | [HUD: elements, messages and tool icons](#8-hud-elements-messages-and-tool-icons) | a new HUD message, tool icon, HUD element, or a restyle |
+| 9 | [Menus: buttons, popups, fonts and the main menu](#9-menus-buttons-popups-fonts-and-the-main-menu) | a new menu button, a yes / no question, a new font, the menu background |
 
 > **How this guide was written.** It was derived by reading the C++ in `Source/SunsetCove/` and the existing system docs, and by looking at the folder structure of `Content/` (not the contents of the assets). Nothing here was run in the editor. Steps that depend on what is inside an asset (for example the exact bones of your Blender rig) are marked **(check)**.
 
@@ -65,7 +67,8 @@ What exists today, and what is suggested for new items. The suggestions are cons
 | Animations **of the item itself** (`AS_Umbrella_Open`...) | next to its mesh, in `Content/Mesh/Props/<Item>/` or `Content/Mesh/Tools/<Item>/` | suggested |
 | **Prop Blueprints** (`BP_Sunbed`...) | `Content/Gameplay/Props/` | suggested. Today `BP_Sunbed` is in `Content/Gameplay/Blueprints/`: leave it, or move it in the Content Browser (Move + *Fix Up Redirectors*) |
 | **Tool Blueprints** (`BP_Bucket`...) | `Content/Gameplay/Tools/` | suggested (new folder) |
-| Tool icon (radial menu) | `Content/UI/HUD/Elements/` or a new `Content/UI/Icons/Tools/` | suggested |
+| Tool icon (radial menu) | `Content/UI/HUD/Textures/ToolIcons/` (`T_ToolIcon_<ToolId>`) | exists (placeholders for Bucket, Spray, Toy, GarbageBag + `T_ToolIcon_Placeholder`) |
+| HUD elements (crosshair, suggestion feed, tool wheel) and the message table | `Content/UI/HUD/Elements/`, `Content/UI/HUD/Data/DT_HUDNotifications` | exists, see chapter 8 |
 | **Arms animations** from the animator | `Content/Animation/ArmsItems/Items/<Item>/` | exists as a convention (see the Animation guide) |
 | The data asset of all arms animations | `Content/Animation/ArmsItems/DA_ArmsAnimations` | exists |
 | Base unarmed arms animations (`AS_Idle`...) | `Content/Animation/FirstPerson/` | do **not** put item animations here |
@@ -326,7 +329,9 @@ Same as 2.2, into `Content/Mesh/Tools/<Item>/`.
 | Class Defaults > `Tool \| Identity` > **Tool Id** | the unique id (`Bucket`). **Not** automatic for tools |
 | Class Defaults > `Tool \| Identity` > **Display Name** | the name shown to the player |
 
-**Recommended:** `Tool \| Identity` > **Icon** (a `Texture2D` for the radial menu; the menu widget is not built yet, so it can wait).
+**Recommended:** `Tool \| Identity` > **Icon** (a square `Texture2D`, white glyph on transparent, in `Content/UI/HUD/Textures/ToolIcons/`; texture settings in chapter 8). Without it the wheel shows the generic placeholder icon.
+
+> **Placeholders already exist:** `BP_Bucket`, `BP_Spray`, `BP_Toy`, `BP_GarbageBag` in `Content/Gameplay/Tools/` have their Tool Id, Display Name and Icon set, but **no mesh yet** (they are invisible; one warning each at Play). When the meshes arrive, set the ToolMesh of these Blueprints instead of creating new ones.
 
 **How the tool behaves (Class Defaults > `Tool \| Use`):**
 
@@ -386,10 +391,10 @@ Complete checklist and tuning: `Docs/InventorySystem/ToolInventorySystem/Engine_
 |---|---|---|---|
 | 1 | **Project Settings** | **No** | nothing (same as props: standard collision, no custom channels) |
 | 2 | **Input** | **No** | Tab (`IA_ToolMenu`), left mouse (`IA_PropPlace`), Q (`IA_PropDrop`) and E are already mapped and shared with the props |
-| 3 | **`BP_Character` > Tool Inventory** | **Only if** you will carry **more than 4 tools** | raise `ToolInventory \| Slots > Max Tools` (1-8). The radial menu has one sector per slot. GDD says "about 4", still to confirm |
+| 3 | **`BP_Character` > Tool Inventory** | **Only if** you will carry **more than 4 tools**, or want it at start | raise `ToolInventory \| Slots > Max Tools` (1-12): the HUD wheel builds one slice per slot by itself. **Starting Tools** (same category) lists the tools the player has at start; today it holds the 4 placeholders for testing, empty it when tools come from the visitors' spots |
 | 4 | **`DA_ArmsAnimations`** | **Yes, for hand animations** | section 3.7 |
 | 5 | **Targets** (crab, child, visitor, litter actors) | **Yes, for the tool to do anything** | section 3.6. Without a target implementing the interface, the tool is used on nothing. This is where the effect lives |
-| 6 | **Radial menu widget (HUD)** | **When it is built** | the widget reads `Tool Id`, `Display Name` and `Icon` from the tool; the system fires the events (`On State Changed`, `On Radial Hover Changed`) but draws nothing yet. Set the **Icon** so it is ready |
+| 6 | **Radial menu widget (HUD)** | **No** | `WBP_ToolRadialMenu` reads `Display Name` and `Icon` from the tool by itself. Only set the tool's **Icon** |
 | 7 | **Spawning in the visitors' spots** (GDD: random, `probabilita_spawn`) | **Not implemented yet** | no code in the project spawns tools; for now place them by hand. When that system exists, the new tool must be added to its list/table |
 | 8 | **Gameplay Tags** | **No** | tools do not use tags |
 | 9 | **Collision / trace channel** | **Only if** your target does not block Visibility | change `Use Trace Channel` on the tool, or make the target block Visibility |
@@ -504,3 +509,86 @@ C++ is needed only if: <what the current systems cannot do>
 ```
 
 Add the new chapter to the table at the top of this file, and link the system doc that explains how it works inside.
+
+---
+
+## 8. HUD: elements, messages and tool icons
+
+The gameplay HUD is `WBP_HUD` plus independent **elements** listed in `DA_UIConfig`: the crosshair, the top-left suggestion feed and the tool wheel (hold **Tab**). How it works inside: [`Docs/UISystem/UI_HUD_Architecture.md`](../UISystem/UI_HUD_Architecture.md).
+
+### 8.1 A new message in the suggestion feed
+
+1. Open `Content/UI/HUD/Data/DT_HUDNotifications` > **Add** a row. The **row name** is the id (`Tip.Barrier`, `Event.Police.Warning`...).
+2. **Message**: short, one line; name **actions**, never keys (every key can be remapped). **Duration Seconds** 0 = default (4 s). **Show Once Per Session** for tutorial tips.
+3. Send it from the system that knows when: Blueprint node **Get SunsetCoveHUDSubsystem** > **Show Notification By Id** (row name). Runtime text (a name, an amount): **Show Notification**.
+
+A missing row only logs `HUD: no notification row '<id>'` (filter `LogSunsetCove`).
+
+### 8.2 A new tool icon
+
+| Step | What |
+|---|---|
+| Image | square PNG (128 px is enough), **white glyph on transparent** (the wheel tints it: white normally, dark on the highlighted slice) |
+| Folder / name | `Content/UI/HUD/Textures/ToolIcons/T_ToolIcon_<ToolId>` |
+| Texture settings | Compression **UserInterface2D** (or EditorIcon), Texture Group **UI**, Mip Gen Settings **NoMipmaps**, Never Stream **on** |
+| Link | tool Blueprint > `Tool \| Identity` > **Icon** |
+
+### 8.3 Restyle or hide
+
+| What | Where |
+|---|---|
+| Crosshair size, color, opacity, ring, custom texture | `WBP_Crosshair` > Class Defaults > `Crosshair \| Look` |
+| Hide the crosshair during an event | **Get SunsetCoveHUDSubsystem** > **Set Crosshair Hidden By** (any reason name, true / false) |
+| Feed font, color, uppercase, lines, timing | `WBP_NotificationFeed` > Class Defaults > `Notifications \| Style / Timing` |
+| Feed position | `WBP_NotificationFeed` designer: move the Vertical Box **MessageContainer** (keep its name) |
+| Wheel radii, colors, pop-out, icons, label, slice texture / material | `WBP_ToolRadialMenu` > Class Defaults > `Radial \| ...` (the designer shows a live preview) |
+| Number of slices | `BP_Character` > Tool Inventory > **Max Tools** (1-12) |
+
+### 8.4 A new HUD element (clock, money, minimap...)
+
+1. Widget Blueprint in `Content/UI/HUD/Elements/`, parent **Sunset Cove HUD Element Widget** (C++ class for logic, or Blueprint only).
+2. `Content/UI/Config/DA_UIConfig` > **HUD Elements** > add: Element Id (unique), Slot Tag `CoreFramework.UI.HUDSlot.Default`, Widget Class. Order = draw order (last on top).
+3. Nothing in `WBP_HUD` changes.
+
+### 8.5 What else to touch (the checklist)
+
+| # | Where | Needed? | What to do |
+|---|---|---|---|
+| 1 | Project Settings > Game > **Sunset Cove UI** | **No** | already points to `DT_HUDNotifications`; change only to use another table |
+| 2 | `DA_UIConfig` > **Screens** | only for a **new screen** (menu, popup) | add tag + widget class + layer; a screen not listed there never opens (`PushScreen: no screen registered`) |
+| 3 | Input | **No** | the wheel uses `IA_ToolMenu` (Tab / RB), already mapped in `IMC_SunsetCove` |
+| 4 | `BP_Character` > Class Defaults > `SunsetCove \| HUD` | only to change **which row** a tool refusal shows | **Tool Refusal Notifications** (reason → row), **Tool Pickup Tip Notification** |
+| 5 | `Plugins/CoreFramework` | **Never** | |
+
+---
+
+## 9. Menus: buttons, popups, fonts and the main menu
+
+How the main menu works inside: [`Docs/UISystem/UI_MainMenu_Architecture.md`](../UISystem/UI_MainMenu_Architecture.md).
+
+### 9.1 A new menu button (any menu or popup)
+
+1. Drag **`WBP_Button_Menu`** (`Content/UI/Components/Buttons/`) into the menu's Vertical Box. Set **Button Label** on the placed button.
+2. Hover and keyboard / gamepad focus never leave two buttons highlighted (the preset's parent `USunsetCoveMenuButton` makes the mouse take the focus; see the main menu doc, section 6). Nothing to style: the look comes from `BP_ButtonStyle_Menu` and the `BP_TextStyle_MenuButton*` text styles (gray idle, white + bar when hovered or focused, faded when disabled). Change those assets to restyle **every** menu and popup button at once.
+3. Logic: in a C++ menu add a `BindWidget` button with the same name and bind `OnClicked()` (see `USunsetCoveMainMenuWidget`); in a Blueprint menu use the button's **On Clicked** event.
+
+### 9.2 A new yes / no question
+
+Use the existing popup, never a new widget: `UBaseConfirmPopupWidget::OpenConfirmation(UIFrame, UI.Screen.ConfirmPopup, Request, Callback)` (C++) or *Push Screen* `UI.Screen.ConfirmPopup` → *Setup Confirm* → *On Result* (Blueprint). Put the texts in an `FUIConfirmRequest` property so designers edit them in Class Defaults. Keep **Focus Confirm Button** off for destructive actions.
+
+### 9.3 A new font
+
+| Step | What |
+|---|---|
+| Import | the `.ttf` into `Content/UI/Fonts/` (creates a **Font Face** and a **Font**) |
+| Use | in a **text style** (`Content/UI/Components/Text/BP_TextStyle_*` > Font > Font Family = the Font), never directly on a text widget |
+| Check | if the text sits much lower than its widget (decorative fonts like Scriptina), set Ascend / Descend overrides on the Font Face (values in 1/64 of the font's units, see the main menu doc, section 3) |
+
+### 9.4 What else to touch (the checklist)
+
+| # | Where | Needed? | What to do |
+|---|---|---|---|
+| 1 | `DA_UIConfig` > Screens | only for a **new screen** | tag + widget class + layer (popups on `CoreFramework.UI.Layer.Modal`) |
+| 2 | Project Settings > Game > **Sunset Cove Game Flow** | only to change the world slot name or the maps New Game / Continue open | |
+| 3 | `L_MainMenu` | only to change the menu background | move `MenuCamera`, edit `PP_MenuSunset`, swap the cove level instance |
+| 4 | `Plugins/CoreFramework` | **Never** | |

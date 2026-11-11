@@ -17,6 +17,7 @@
 #include "InventorySystem/ToolInventorySystem/ToolInventoryComponent.h"
 #include "Movement/BaseCharacterMovementComponent.h"
 #include "Net/UnrealNetwork.h"
+#include "UISystem/HUD/SunsetCoveHUDSubsystem.h"
 
 ASunsetCoveCharacter::ASunsetCoveCharacter(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
@@ -30,6 +31,13 @@ ASunsetCoveCharacter::ASunsetCoveCharacter(const FObjectInitializer& ObjectIniti
 	PropInventory = CreateDefaultSubobject<UPropInventoryComponent>(TEXT("PropInventory"));
 	ToolInventory = CreateDefaultSubobject<UToolInventoryComponent>(TEXT("ToolInventory"));
 	ArmsAnimation = CreateDefaultSubobject<UArmsAnimationComponent>(TEXT("ArmsAnimation"));
+
+	// Default HUD messages of the tool refusals (rows of DT_HUDNotifications). Editable in BP_Character > Class Defaults.
+	ToolRefusalNotifications.Add(EToolRefusal::HandsBusy, TEXT("Tool.Refused.HandsBusy"));
+	ToolRefusalNotifications.Add(EToolRefusal::InventoryFull, TEXT("Tool.Refused.InventoryFull"));
+	ToolRefusalNotifications.Add(EToolRefusal::AlreadyOwned, TEXT("Tool.Refused.AlreadyOwned"));
+	ToolRefusalNotifications.Add(EToolRefusal::ToolBlocked, TEXT("Tool.Refused.ToolBlocked"));
+	ToolRefusalNotifications.Add(EToolRefusal::NoTools, TEXT("Tool.Refused.NoTools"));
 }
 
 // ----------------------------------------------------------------------
@@ -74,6 +82,10 @@ void ASunsetCoveCharacter::PostInitializeComponents()
 		{
 			ToolInventory->RegisterWithInteraction(Interaction);
 		}
+
+		// The HUD tells the player why a tool action was refused, and how to open the tool menu after the first pickup.
+		ToolInventory->OnActionRefused.AddUniqueDynamic(this, &ASunsetCoveCharacter::OnToolActionRefused);
+		ToolInventory->OnToolAction.AddUniqueDynamic(this, &ASunsetCoveCharacter::OnToolInventoryAction);
 	}
 
 	if (ArmsAnimation)
@@ -246,6 +258,35 @@ void ASunsetCoveCharacter::OnPropSlotsChanged()
 	if (ToolInventory && PropInventory)
 	{
 		ToolInventory->SetHandsBusy(PropInventory->IsHoldingAnyProp());
+	}
+}
+
+void ASunsetCoveCharacter::OnToolActionRefused(EToolRefusal Reason, ASunsetCoveTool* /*Tool*/)
+{
+	// The HUD only exists for the local player; the inventories never know the HUD (the subsystem is the message hub).
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	const FName* NotificationId = ToolRefusalNotifications.Find(Reason);
+	USunsetCoveHUDSubsystem* HUD = USunsetCoveHUDSubsystem::Get(this);
+	if (NotificationId && HUD)
+	{
+		HUD->ShowNotificationById(*NotificationId);
+	}
+}
+
+void ASunsetCoveCharacter::OnToolInventoryAction(EToolAction Action, int32 /*SlotIndex*/, ASunsetCoveTool* /*Tool*/)
+{
+	if (Action != EToolAction::Pickup || ToolPickupTipNotification.IsNone() || !IsLocallyControlled())
+	{
+		return;
+	}
+
+	if (USunsetCoveHUDSubsystem* HUD = USunsetCoveHUDSubsystem::Get(this))
+	{
+		HUD->ShowNotificationById(ToolPickupTipNotification);
 	}
 }
 

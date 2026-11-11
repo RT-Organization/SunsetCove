@@ -21,7 +21,8 @@ namespace
 	/** Id of the pickup handler in the Interaction System. */
 	const FName ToolPickupHandlerId(TEXT("ToolInventory.Pickup"));
 
-	constexpr int32 MaxSlotCount = 8;
+	/** Hard limit of MaxTools (the ClampMax of the property). The HUD wheel stays readable up to here. */
+	constexpr int32 MaxSlotCount = 12;
 
 	bool ToolCollisionHasPhysics(ECollisionEnabled::Type Collision)
 	{
@@ -50,6 +51,52 @@ void UToolInventoryComponent::BeginPlay()
 	Slots.SetNum(FMath::Clamp(MaxTools, 1, MaxSlotCount));
 
 	ValidateHandSockets();
+
+	// Next frame: the arms animation and the other components of the owner have run their BeginPlay by then.
+	if (StartingTools.Num() > 0)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this, [this]()
+			{
+				GiveStartingTools();
+			}));
+		}
+	}
+}
+
+void UToolInventoryComponent::GiveStartingTools()
+{
+	AActor* Owner = GetOwner();
+	UWorld* World = GetWorld();
+	if (!Owner || !World || !Owner->HasAuthority())
+	{
+		return;
+	}
+
+	for (const TSubclassOf<ASunsetCoveTool>& ToolClass : StartingTools)
+	{
+		if (!ToolClass)
+		{
+			continue;
+		}
+		if (FindFreeSlotIndex() == INDEX_NONE)
+		{
+			UE_LOG(LogSunsetCove, Warning, TEXT("ToolInventory: more Starting Tools than slots (Max Tools = %d); the rest are ignored."), Slots.Num());
+			break;
+		}
+
+		FActorSpawnParameters SpawnParams;
+		SpawnParams.Owner = Owner;
+		SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+
+		ASunsetCoveTool* Tool = World->SpawnActor<ASunsetCoveTool>(ToolClass, Owner->GetActorTransform(), SpawnParams);
+		if (Tool && !TryPickupTool(Tool))
+		{
+			// Refused (for example a duplicate ToolId): the refusal event already said why; do not leave it lying at the player's feet.
+			Tool->Destroy();
+		}
+	}
 }
 
 void UToolInventoryComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)

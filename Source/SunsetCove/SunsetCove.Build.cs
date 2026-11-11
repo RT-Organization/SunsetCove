@@ -28,6 +28,10 @@ public class SunsetCove : ModuleRules
 		// AssetRegistry: only the editor helper "Populate From Naming Convention" of the arms animation data asset uses it.
 		PrivateDependencyModuleNames.AddRange(new string[] { "AssetRegistry" });
 
+		// UI System / HUD: Slate drawing of the crosshair and the tool wheel, the CommonUI parents of the CoreFramework widgets,
+		// and the Project Settings page (UDeveloperSettings).
+		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "CommonUI", "DeveloperSettings" });
+
 		// Expose custom subfolders so headers can be found cleanly
 		PublicIncludePaths.AddRange(new string[] 
 		{

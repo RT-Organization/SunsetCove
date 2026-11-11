@@ -30,6 +30,7 @@
 #include "CoreMinimal.h"
 #include "Character/BaseCharacter.h"
 #include "InventorySystem/PropInventorySystem/PropInventoryTypes.h"
+#include "InventorySystem/ToolInventorySystem/ToolInventoryTypes.h"
 #include "SunsetCoveCharacter.generated.h"
 
 class UEnhancedInputComponent;
@@ -116,6 +117,21 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SunsetCove|Components")
 	TObjectPtr<UArmsAnimationComponent> ArmsAnimation;
 
+	// ------------------------------------------------------------------
+	// HUD messages (row names of the HUD notification table, see Public/UISystem/HUD/)
+	// ------------------------------------------------------------------
+
+	/**
+	 * The message shown in the HUD suggestion feed when the Tool Inventory refuses something, per reason. Values are row names of
+	 * the notification table (Project Settings > Game > Sunset Cove UI). Remove an entry to stay silent for that reason.
+	 */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SunsetCove|HUD")
+	TMap<EToolRefusal, FName> ToolRefusalNotifications;
+
+	/** One-time tip shown when a tool is picked up (how to open the tool menu). None = no tip. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "SunsetCove|HUD")
+	FName ToolPickupTipNotification = TEXT("Tip.ToolMenu");
+
 protected:
 	// ------------------------------------------------------------------
 	// Project hooks (new virtual functions of this class)
@@ -148,6 +164,17 @@ protected:
 	 */
 	UFUNCTION()
 	virtual void OnPropSlotsChanged();
+
+	/**
+	 * The Tool Inventory refused an action (bound in PostInitializeComponents). Asks the HUD message hub for the row of
+	 * ToolRefusalNotifications, so the player is told why (hands busy, no tools...). Local player only.
+	 */
+	UFUNCTION()
+	virtual void OnToolActionRefused(EToolRefusal Reason, ASunsetCoveTool* Tool);
+
+	/** An action of the Tool Inventory happened (bound in PostInitializeComponents). A pickup shows the one-time tool menu tip. */
+	UFUNCTION()
+	virtual void OnToolInventoryAction(EToolAction Action, int32 SlotIndex, ASunsetCoveTool* Tool);
 
 	// ------------------------------------------------------------------
 	// Framework input handlers (overrides, see the note at the top of this file)

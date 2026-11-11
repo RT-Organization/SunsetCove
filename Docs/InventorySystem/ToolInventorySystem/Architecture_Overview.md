@@ -20,7 +20,7 @@ It is the sibling of the Prop Inventory (the two hands for sunbeds and umbrellas
 | It does | It does NOT do |
 |---|---|
 | pick a tool up from the world (called by the Interaction System) | spawn tools in the visitors' spots (a future visitor system does that) |
-| keep up to `MaxTools` tools, show one in the hand | draw the radial menu (only the selection logic and the events exist) |
+| keep up to `MaxTools` tools, show one in the hand | draw the radial menu (the HUD does it: `UToolRadialMenuWidget`, see `Docs/UISystem/UI_HUD_Architecture.md`) |
 | radial selection from the look direction (GTA weapon wheel) | play any animation (only the hooks exist) |
 | use the equipped tool (find the target, call it) | decide what a tool *does* to a crab or a child (the target and the tool class do) |
 | drop a tool on the ground | load the tools table from the data sheets (`ToolId` is the key for it later) |
@@ -193,7 +193,7 @@ Same "blocked check" convention as `IPropInterface`: a Blueprint that adds the i
 
 ### 4.3 `UToolInventoryComponent`
 
-**Slots.** `MaxTools` slots (default 4, 1-8), fixed at `BeginPlay`. `FToolSlot` = the tool and the collision mode it had before the pickup. `EquippedSlotIndex` (-1 = holstered).
+**Slots.** `MaxTools` slots (default 4, 1-12), fixed at `BeginPlay`. `StartingTools` (classes) are spawned and picked up one frame after `BeginPlay`, in order (authority only). `FToolSlot` = the tool and the collision mode it had before the pickup. `EquippedSlotIndex` (-1 = holstered).
 
 **The hand socket.** Looked up by name on the first-person arms: `ToolSocketName` (`Tool_R`) first, then `FallbackToolSocketName` (`Prop_R`), then a relative offset from the arms mesh (`FallbackLocation` / `FallbackRotation`) with one warning. So a dedicated tool hand point in Blender is optional. A bone and a socket are equivalent (`DoesSocketExist` resolves both). `BeginPlay` checks the names once and logs what is missing.
 

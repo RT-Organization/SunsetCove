@@ -116,9 +116,20 @@ public:
 	// Configuration: slots
 	// ------------------------------------------------------------------
 
-	/** How many tools the player can carry (GDD: about 4). The radial menu has one sector per slot. Changing it at runtime is not supported. */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Slots", meta = (ClampMin = "1", ClampMax = "8"))
+	/**
+	 * How many tools the player can carry (GDD: about 4). The radial menu has one sector per slot and the HUD wheel builds one slice per
+	 * slot, so this number alone decides the wheel layout. Changing it at runtime is not supported.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Slots", meta = (ClampMin = "1", ClampMax = "12"))
 	int32 MaxTools = 4;
+
+	/**
+	 * Tools the player already carries when the game starts (GDD MVP: "which tools are initial", still to decide). Each class is
+	 * spawned and picked up on the first frame, in order, so the first one lands in slot 0. Extra entries past MaxTools are ignored.
+	 * Empty = the player starts with no tools and finds them in the visitors' spots.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Slots")
+	TArray<TSubclassOf<ASunsetCoveTool>> StartingTools;
 
 	/** False: a tool with the same ToolId as one already owned is refused (tools are used forever, a second one is useless). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Slots")
@@ -396,6 +407,8 @@ private:
 	bool HandleInteraction(AActor* Target);
 
 	// ---- Slots ----
+	/** Spawns and picks up StartingTools (authority only). Runs one frame after BeginPlay, when every component has started. */
+	void GiveStartingTools();
 	bool IsSlotOccupied(int32 SlotIndex) const;
 	int32 FindFreeSlotIndex() const;
 	bool IsToolOwned(const ASunsetCoveTool* Tool) const;

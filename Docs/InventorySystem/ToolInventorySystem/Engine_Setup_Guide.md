@@ -21,7 +21,7 @@ When the steps below are done, in first person you can:
 | Grab a sunbed or an umbrella while a tool is in the hand | the tool is put away and **stays** away until you choose it again |
 | Hands full of props, press **Tab** or **E** on a tool | refused |
 
-There is **no radial menu drawing** and **no animation** yet (the system only fires the events for them). While the menu is open you see nothing; you will see the tool change in the hand when you release Tab. Use the Output Log to follow it (section 9).
+While Tab is held the HUD draws the tool wheel (`WBP_ToolRadialMenu`, see `Docs/UISystem/UI_HUD_Architecture.md`); refusals are written in the top-left suggestion feed. The arms animations are a separate layer (`Docs/AnimationSystem/`).
 
 What is left to do **in the editor** (Input Actions and the mapping context are assets, so they cannot be made by code):
 
@@ -95,7 +95,7 @@ First person is required, exactly as for props (prop guide, section 2).
 | `IA_PropDrop` | — | — | **already exists**. Used for **Drop prop** and also for **Drop tool** |
 | `IA_Interact` | — | — | **already exists**. Picks the tool up |
 
-Create `IA_ToolMenu` in `Content/InventorySystem/ToolInventorySystem/Input/` (right-click > **Input > Input Action**). **No triggers** (no Hold, no Pressed): the system needs *Started* on press and *Completed* on release.
+`IA_ToolMenu` **already exists** in `Content/Input/Actions/` (mapped to Tab and RB in `IMC_SunsetCove`, assigned on `BP_Character`). To recreate it: right-click > **Input > Input Action**. **No triggers** (no Hold, no Pressed): the system needs *Started* on press and *Completed* on release.
 
 **Why the same asset for two components?** The left mouse button is "place a prop" and "use the tool"; Q is "drop a prop" and "drop a tool". Each component acts only in its own situation (props in the hands / a tool in the hand, menu open), so they never both act. Using **one asset per key** also avoids a classic Enhanced Input trap: two different actions mapped to the same key, where the first one swallows the key and the second never fires.
 
@@ -188,17 +188,21 @@ Select **Tool Inventory** on `BP_Character`.
 
 | Category | Property | Default | Change it when |
 |---|---|---|---|
-| `ToolInventory\|Slots` | `Max Tools` | 4 | the GDD limit changes (1-8). The wheel has one sector per slot |
+| `ToolInventory|Slots` | `Max Tools` | 4 | the GDD limit changes (1-12). The wheel has one sector per slot and the HUD draws one slice per slot |
+| | `Starting Tools` | the 4 placeholder tools | tools the player has at start (spawned and picked up on the first frame, first entry = slot 0). Empty it when tools come from the visitors' spots |
 | | `Allow Duplicate Tools` | off | you want to carry two of the same `Tool Id` |
 | | `Auto Equip First Tool` | on | you do not want the first tool taken out on pickup |
-| `ToolInventory\|Hand` | `Use First Person Arms` | on | tools on the third-person body instead |
+| `ToolInventory|Slots` | `Max Tools` | 4 | the GDD limit changes (1-12). The wheel has one sector per slot and the HUD draws one slice per slot |
+| | `Starting Tools` | the 4 placeholder tools | tools the player has at start (spawned and picked up on the first frame, first entry = slot 0). Empty it when tools come from the visitors' spots |\|Hand` | `Use First Person Arms` | on | tools on the third-person body instead |
 | | `Tool Socket Name` / `Fallback Tool Socket Name` | `Tool_R` / `Prop_R` | the names from Blender are different |
 | | `Fallback Location / Rotation` | 45, 25, -30 cm | no sockets yet and the tool hangs badly |
-| `ToolInventory\|Radial` | `Radial Radius` | 60 | the wheel is too sensitive (raise) or too sluggish (lower). It is how much mouse movement pushes the cursor to the edge |
+| `ToolInventory|Slots` | `Max Tools` | 4 | the GDD limit changes (1-12). The wheel has one sector per slot and the HUD draws one slice per slot |
+| | `Starting Tools` | the 4 placeholder tools | tools the player has at start (spawned and picked up on the first frame, first entry = slot 0). Empty it when tools come from the visitors' spots |\|Radial` | `Radial Radius` | 60 | the wheel is too sensitive (raise) or too sluggish (lower). It is how much mouse movement pushes the cursor to the edge |
 | | `Radial Dead Zone` | 0.35 | accidental selections near the center (raise) or you have to move too far (lower) |
 | | `Radial Start Angle Degrees` | 0 | rotate the layout. 0 = slot 0 at the top, the rest clockwise |
 | | `Invert Radial Y` | off | moving the mouse **up** selects the **bottom** sector: turn it on |
-| `ToolInventory\|Drop` | `Drop Forward Speed` / `Drop Up Speed` | 250 / 100 cm/s | the tool flies too far / too little |
+| `ToolInventory|Slots` | `Max Tools` | 4 | the GDD limit changes (1-12). The wheel has one sector per slot and the HUD draws one slice per slot |
+| | `Starting Tools` | the 4 placeholder tools | tools the player has at start (spawned and picked up on the first frame, first entry = slot 0). Empty it when tools come from the visitors' spots |\|Drop` | `Drop Forward Speed` / `Drop Up Speed` | 250 / 100 cm/s | the tool flies too far / too little |
 | | `Inherit Owner Velocity Scale` | 1 | 0 = ignore the player's speed |
 | | `Drop Pawn Ignore Seconds` | 0.35 | the tool bumps into you |
 | | `Drop Wall Margin`, `Wall Trace Channel` | 20 cm, Visibility | the tool ends up inside a wall |
@@ -243,8 +247,8 @@ Put in the level: two different tools (for example `BP_Bucket` with `Tool Id = B
 
 ---
 
-## 10. Later: the radial menu widget and the animations
+## 10. The radial menu widget and the animations
 
-The hooks already exist; see `Architecture_Overview.md`, sections 7.3 (the widget) and 7.4 (the animations). In short: **On State Changed** shows the widget and **On Radial Hover Changed** highlights a sector.
+The widget is built: `WBP_ToolRadialMenu` (C++ `UToolRadialMenuWidget`), documented in `Docs/UISystem/UI_HUD_Architecture.md`. It listens to **On State Changed**, **On Radial Hover Changed**, **On Slots Changed** and **On Equipped Tool Changed**, and builds one slice per slot. The animation hooks: `Architecture_Overview.md` section 7.4.
 
 **Arms animations** are done by the arms animation system: see `../../AnimationSystem/Engine_Setup_Guide.md` (setup, the animator's files, the test checklist) and `../../AnimationSystem/Architecture_Overview.md`. It listens to this component and also decides *when* a tool is shown, hidden, attached or dropped (`Architecture_Overview.md` of this system, section 7.5). Nothing to wire here.
