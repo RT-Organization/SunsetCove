@@ -6,9 +6,11 @@
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Animation/AnimationAsset.h"
 #include "Engine/SkeletalMesh.h"
 #include "Engine/StaticMesh.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "Interfaces/PropInterface.h"
 #include "Materials/MaterialInterface.h"
 
 APropPlacementHologram::APropPlacementHologram()
@@ -101,8 +103,20 @@ void APropPlacementHologram::InitializeFromProp(const AActor* SourceProp, UMater
 
 		Copy->SetRelativeTransform(Source->GetComponentTransform().GetRelativeTransform(SourceRootTransform));
 
-		// The copy shows the pose the prop has now (for example the folded pose it is carried in).
-		Copy->SetLeaderPoseComponent(Source);
+		// The pose of the copy. A prop that is carried folded will be put down OPEN, so it can say which pose the hologram shows
+		// (a pose asset, or the last frame of its Open animation). Without that answer the copy follows the pose the prop has now.
+		UAnimationAsset* PreviewPose = nullptr;
+		float PreviewTime = 0.0f;
+		if (SourceProp->Implements<UPropInterface>() && IPropInterface::Execute_GetPropPlacementPreviewPose(SourceProp, PreviewPose, PreviewTime) && PreviewPose)
+		{
+			Copy->PlayAnimation(PreviewPose, /*bLooping=*/false);
+			Copy->SetPosition(PreviewTime, /*bFireNotifies=*/false);
+			Copy->Stop();
+		}
+		else
+		{
+			Copy->SetLeaderPoseComponent(Source);
+		}
 
 		const int32 MaterialCount = Copy->GetNumMaterials();
 		for (int32 Index = 0; Index < MaterialCount; ++Index)

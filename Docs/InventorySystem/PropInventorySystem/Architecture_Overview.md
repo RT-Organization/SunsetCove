@@ -182,7 +182,12 @@ Two slots, index 0 = right hand, 1 = left hand (`FPropSlot`: the prop, a grab se
 - **Auto fit** (`bAutoFitCollisionToMesh`, default on): in `OnConstruction` (so also in the Blueprint viewport) the box is sized from the mesh bounds (`+ CollisionPadding`) and the mesh is moved until its center is on the root. Reason: the root is the center of the box, and the center of the box is the pivot of the physics. The bounds come from the reference pose, brought into root space with the mesh's relative rotation and scale. Off: use `CollisionBoxExtent` and place the mesh by hand.
 - **Grip** (`GripSocketName`, default `Grip_R`; optional `LeftGripSocketName`): a bone or socket of the prop skeleton, made by the animator in Blender. `GetGripTransformInRoot` reads it with `GetSocketTransform(..., RTS_Actor)` (the actor space is the root's, location and rotation only). Missing grip: identity (the root center is held) and one warning at `BeginPlay`. The left hand uses `LeftGripSocketName` if it exists, otherwise the same grip.
 - **Fine tune** (`HoldLocationOffset`, `HoldRotationOffset`): applied in the space of the hand socket on top of the grip alignment. Zero when the Blender grip is right.
-- **Animation**: `PickedUpAnimation` / `PlacedAnimation` (optional `UAnimationAsset`, played once with `PlayAnimation`, so they use single-node mode and replace an Animation Blueprint on the mesh), and the Blueprint events `BP_OnGrabbed / Dropped / Placed / Thrown` (display names *On Grabbed*...) for Animation-Blueprint-driven props.
+- **Animation** (revision 3, the Open / Close flow): `PickedUpAnimation` is the **Close** animation and `PlacedAnimation` the **Open** one (optional `UAnimationAsset`, played once with `PlayAnimation`, so they use single-node mode and replace an Animation Blueprint on the mesh). The prop keeps one state, `bIsOpen` (`IsOpen()`; true at `BeginPlay`):
+  - **Grab accepted** → `OnPropGrabStarted` (new `IPropInterface` event): the rest spots are switched off, and if the prop is open it plays Close **where it lies**, becomes closed and **returns the length of Close in seconds**. A prop that is already closed (dropped or thrown) returns 0. With no Close animation the prop is just snapped closed (`ClosedPoseAnimation`, if set) and returns 0.
+  - **Attach** (`OnPropGrabbed`, at the commit): if Close was still playing (an interruption flushed the grab) the prop jumps to its last frame, so it is always carried closed.
+  - **Placed** (`OnPropPlaced`): a closed prop plays Open (or snaps to `OpenPoseAnimation`) and becomes open. Drop and throw change nothing: the prop lands closed.
+  - **Optional poses** `OpenPoseAnimation`, `ClosedPoseAnimation` (one-frame animation assets, applied by `ApplyPose`: single node, positioned, stopped): the starting pose at `BeginPlay`, the snap target of an interruption, and `GetPropPlacementPreviewPose` (what the placement hologram shows: the open pose, else the last frame of Open).
+  - The Blueprint events `BP_OnGrabStarted / OnGrabbed / OnDropped / OnPlaced / OnThrown` (display names *On Grab Started*, *On Grabbed*...) are for Animation-Blueprint-driven props (they cannot give a duration, so their wait is 0).
 - **Physics**: `MassKg` (applied in `OnConstruction`), `bStartSimulatingPhysics` (applied in `BeginPlay`, default off: a prop in the level is solid until grabbed). `bCanBePickedUp` backs `IsPickupBlocked`.
 - **Caveat for animators**: the grip is read at grab time from the current pose. Keep the grip bone unkeyed (or at rest where it is held), otherwise a prop that was placed with an animated pose will be held at a different offset than one that was never animated.
 
@@ -218,6 +223,8 @@ stateDiagram-v2
 
 Not an input of this system. The Interaction System aims from the camera; when the player presses Interact on an actor that no `IInteractableInterface` claims, it asks its registered handlers. The Prop Inventory registered one (`"PropInventory.Grab"`): `CanHandle` = `CanGrabProp`, `Handle` = `TryGrabProp`. So an actor is *focused* (and a prompt can be shown) only when it can really be grabbed now. `TryGrabProp` is also `BlueprintCallable` for tests and future systems.
 
+On accept, `TryGrabProp` freezes the prop (physics and collision off), calls `IPropInterface::OnPropGrabStarted` (the prop starts to close and returns the seconds it needs) and passes that time to `BeginCommit` as a **floor**: the attach to the hand happens at the **later** of the prop's own animation and the arms animation's commit point (section 9.5).
+
 ### 6.2 Place (hold, rotate, release)
 
 `BeginPlacement` (Place pressed): locks the active slot, measures the prop (`CalculateComponentsBoundingBoxInLocalSpace`, unscaled, then multiplied by the actor scale), spawns the transient `APropPlacementHologram`, goes to `Placing`.
@@ -226,16 +233,16 @@ Every frame (`UpdatePlacement`):
 
 1. **Surface.** Line trace from the camera along the view, up to `MaxPlacementDistance`, on `SurfaceTraceChannel`. If it hits nothing, a second trace goes straight down from the end of the range (`GroundSnapTraceLength`), so the prop can be placed when looking at the horizon.
 2. **Slope.** Valid only if `Normal.Z >= cos(MaxSurfaceSlopeDegrees)`.
-3. **Transform.** Yaw = camera yaw (`bFollowCameraYaw`) or the yaw at the start, plus the accumulated rotation steps. Optionally tilted to the surface (`bAlignToSurfaceNormal`). The location is the surface point lifted by the prop's own lowest point, so the prop **rests on the ground whatever its pivot**.
+3. **Transform.** Yaw = camera yaw (`bFollowCameraYaw`) or the yaw at the start, plus the accumulated rotation steps. Optionally tilted to the surface (`bAlignToSurfaceNormal`). The location is the surface point lifted by the prop's **base**, so the prop **rests on the ground whatever its pivot**. The base comes from `IPropInterface::GetPropPlacementBounds` (for `ASunsetCoveProp`: the collision box minus its padding, fitted from the reference pose), NOT from the current pose of the mesh: a prop carried folded would otherwise be measured folded and hover when put down open. Props that do not answer fall back to measuring their components as they are.
 4. **Obstacles.** A box overlap test with the prop's footprint, shrunk by `ObstacleBoxShrink` on every side and lifted by `ObstacleBoxBottomLift`, against `ObstacleObjectTypes`. The player, the carried props, the hologram and (by default) the actor the prop stands on are ignored.
 5. **Prop rules.** `IPropInterface::IsPlacementBlocked(transform)`.
 6. The hologram is moved and tinted (`SetValid`); `OnPlacementValidityChanged` fires when the answer flips.
 
 `RotatePlacementSteps` (Rotate action, one mouse wheel notch = one step of `RotationStepDegrees`) changes the accumulated yaw. It does nothing outside `Placing`.
 
-`ConfirmPlacement` (Place released): ends the placement (hologram destroyed, state `Idle`) **always**. If the last hologram state was valid, the prop is put down: detached, teleported to the hologram transform, collision restored to what it was before the grab, physics per `bSimulatePhysicsAfterPlace` (off by default: placed props stay put). On an invalid spot nothing else happens and the prop stays in the hand.
+`ConfirmPlacement` (Place released): ends the placement (hologram destroyed, state `Idle`) **always**. If the last hologram state was valid, the hand is freed at once and, at the commit point of the arms animation, the prop is put down: it detaches **where the hand is** and **flies** to the hologram transform (position and rotation eased, `PlaceTravelSeconds`, at least as long as the prop's Open animation, which starts now through `OnPropPlaceStarted`). It **lands** at the end of the flight: exact placement transform, collision restored to what it was before the grab, physics per `bSimulatePhysicsAfterPlace` (off by default: placed props stay put), then `OnPropPlaced` and `OnPropAction(Place)` (the character switches the rest spots on only now). Several props can fly at once. On an invalid spot nothing else happens and the prop stays in the hand.
 
-The hologram (`APropPlacementHologram`) copies **every visible static and skeletal mesh component** of the prop at the same transform relative to the prop root, so multi-mesh props are copied whole. A skeletal copy uses the original as its **leader pose component**, so the ghost shows the pose the prop has right now (the pose it is carried in). One dynamic material instance of `HologramMaterial` is shared by all copies and its color parameter is set to green or red. **Without a `HologramMaterial`** the copy keeps the prop's materials and validity is shown by visibility (visible = valid, hidden = invalid); one warning is logged.
+The hologram (`APropPlacementHologram`) copies **every visible static and skeletal mesh component** of the prop at the same transform relative to the prop root, so multi-mesh props are copied whole. A skeletal copy shows the pose the prop returns from `IPropInterface::GetPropPlacementPreviewPose` (for `ASunsetCoveProp`: the **open** pose, because it is carried closed but is put down open). If the prop gives none, the copy uses the original as its **leader pose component** and shows the pose the prop has right now. One dynamic material instance of `HologramMaterial` is shared by all copies and its color parameter is set to green or red. **Without a `HologramMaterial`** the copy keeps the prop's materials and validity is shown by visibility (visible = valid, hidden = invalid); one warning is logged.
 
 ### 6.3 Throw (hold, release)
 
@@ -286,6 +293,9 @@ Edit them on the **Prop Inventory** component of `BP_Character` (Components pane
 | | `RightHandSocketName`, `LeftHandSocketName` | `Prop_R`, `Prop_L` | sockets on the arms skeleton |
 | | `RightHandFallbackLocation`, `LeftHandFallbackLocation` | (45, ±25, -30) | used only while the socket is missing |
 | | `HandFallbackRotation` | 0 | used only while the socket is missing |
+| `PropInventory\|Travel` | `bTravelToHand`, `bTravelToPlacement` | true | fly instead of teleport |
+| | `GrabTravelSeconds`, `PlaceTravelSeconds` | 0.35 s, 0.4 s | minimum flight time (also as long as the prop's Close / Open animation) |
+| | `TravelEaseExponent` | 2 | 1 = constant speed, higher = softer start and arrival |
 | `PropInventory\|Placement` | `MaxPlacementDistance` | 350 cm | reach of the placement |
 | | `GroundSnapTraceLength` | 400 cm | downward trace when the view hits nothing |
 | | `MaxSurfaceSlopeDegrees` | 35° | steepest valid surface |
@@ -335,15 +345,29 @@ The slots, the hands and `OnSlotsChanged` change the **instant the player acts**
 
 | Action | Immediate part (logical) | Delayed part (physical, `Commit...`) |
 |---|---|---|
-| Grab | slot filled, physics and collision off (the prop freezes where it is), `OnSlotsChanged` | `CommitGrab`: attach to the hand socket, `OnPropGrabbed`, `OnPropAction(Grab)` |
-| Place | slot emptied, `OnSlotsChanged` | `CommitPlace`: detach, move to the hologram transform captured at the release, collision back, `OnPropPlaced`, `OnPropAction(Place)` |
+| Grab | slot filled, physics and collision off (the prop freezes where it is), `OnPropGrabStarted` (the prop starts closing, rest spots off), `OnSlotsChanged` | `CommitGrab` (not before the prop's Close ends): attach to the hand socket, `OnPropGrabbed`, `OnPropAction(Grab)` |
+| Place | slot emptied, `OnSlotsChanged` | `CommitPlace`: detach, `OnPropPlaceStarted` (Open starts), fly to the hologram transform captured at the release; `FinishPlaceFlight` at the landing: collision back, `OnPropPlaced`, `OnPropAction(Place)` |
 | Throw, Drop | slot emptied, launch speed decided, `OnSlotsChanged` | `CommitRelease`: detach, wall-safety trace from where the hand is now, launch, `OnPropThrown` / `OnPropDropped`, `OnPropAction` |
 
 `UPropInventoryComponent::ActionBeginHook` (a C++ delegate) is called after the logical part and before the physical part; its listener starts an animation and returns an `FActionCommitTiming` (`Core/Utils/SunsetCoveActionCommit.h`): **Immediate**, **AfterDelay** or **OnNotify** (then `CommitPendingAction()` releases it, with a timeout as a safety net). **With no hook bound everything is immediate, exactly as before.** `OnPropAction` keeps meaning "the physical effect took place".
 
-A new action (`TryGrabProp`, `BeginPlacement`, `BeginThrowCharge`), `CancelCurrentAction` (also called by `DropActiveProp`, `EndPlay` and the unpossess) apply a pending effect at once. A prop destroyed while pending is skipped. `IsCommitPending()` says whether one is waiting. The actions now mean "accepted": for example `TryGrabProp` returns true although the attach may follow a moment later.
+**The prop's own wait (Grab only).** `BeginCommit(..., MinWaitSeconds)` also takes the seconds the prop asked for in `OnPropGrabStarted` (its Close animation). The wait becomes `max(hook wait, MinWaitSeconds)`: Immediate turns into a delay, a delay and an OnNotify timeout are raised to it. `PendingCommit.EarliestTime` remembers the floor, so the two release paths differ:
 
-**Future work (requested by the project owner):** the prop should not teleport to the hand. On a Grab it should travel toward the hand and attach to the socket when it arrives. The place is `CommitGrab` (a `FUTURE:` comment marks it in `TryGrabProp` and at the top of the header).
+- `CommitPendingAction()` (public; the arms notify calls it): if the floor has not passed, it re-arms the timer for the remaining time and returns. The notify can end the wait, never shorten the prop's animation.
+- `FlushPendingAction()` (private; the timer, `TryGrabProp`, `BeginPlacement`, `BeginThrowCharge`, `CancelCurrentAction`): applies the effect **now**. The prop is attached at once and `OnPropGrabbed` snaps it to the closed pose.
+
+So the logical rule is unchanged (the hand is occupied at the click); only the physical attach waits.
+
+A new action (`TryGrabProp`, `BeginPlacement`, `BeginThrowCharge`), `CancelCurrentAction` (also called by `DropActiveProp`, `EndPlay` and the unpossess) flush a pending effect at once. A prop destroyed while pending is skipped. `IsCommitPending()` says whether one is waiting. The actions now mean "accepted": for example `TryGrabProp` returns true although the attach may follow a moment later.
+
+**Travel (the prop flies, it does not teleport).** `PropInventory|Travel` (`bTravelToHand`, `bTravelToPlacement`, `GrabTravelSeconds`, `PlaceTravelSeconds`, `TravelEaseExponent`; off = the old teleport):
+
+- **Grab flight** (`FGrabFlight`, one at a time, like the pending commit): `TryGrabProp` stores the start transform and passes `max(prop's Close length, GrabTravelSeconds)` to `BeginCommit` as the floor. Each tick the prop's world location and rotation are set to `Lerp / Slerp(start, target, ease(alpha))`, where the target is `ComputeHandTarget` (the same grip-on-socket transform `AttachPropToHand` produces, recomputed every frame, so the flight follows the player). `CommitGrab` ends the flight and snaps to the socket: no pop. If the arms notify makes the attach later than the flight, the prop stays on the moving hand target.
+- **Place flight** (`FPlaceFlight`, a list): `CommitPlace` detaches keeping the world transform, calls `OnPropPlaceStarted` (Open starts, its length is the floor) and adds the flight. `UpdateFlights` moves it; at the end `FinishPlaceFlight` lands it (collision, physics, `OnPropPlaced`, `OnPropAction(Place)`). `EndPlay` lands every flight at once. A new action does **not** cut a place flight (the hand is already free).
+- **Tick:** the component now also ticks while a prop flies (`RefreshTickEnabled`), in `TG_PostPhysics`, after the arms animation, so the hand socket is up to date.
+- A grab flight is cut by the same rules as the commit (a new action, cancel, EndPlay, unpossess flush it: `FlushPendingAction` attaches at once).
+
+The Tool Inventory pickup does not fly yet.
 
 ### 9.2 Rest spots (visitors)
 

@@ -207,18 +207,35 @@ Then drop it in the level (**do not move PropMesh in the viewport**: with Auto F
 | `Prop\|Physics` | `Mass Kg` | 10 | how heavy it is when pushed by other physics bodies once loose. The throw speed does **not** depend on it |
 | | `Start Simulating Physics` | off | on = it falls and can be pushed from the start; off = it stays where it was put |
 | `Prop\|Rules` | `Can Be Picked Up` | on | off = the player cannot grab it (broken, in use). Settable at runtime |
-| `Prop\|Animation` | `Picked Up Animation`, `Placed Animation` | none | an animation asset played once on the mesh when grabbed / placed |
+| `Prop\|Animation` | `Picked Up Animation` | none | the **Close** animation (`AS_Sunbed_Close`). Plays on the ground when the pickup starts; the prop goes to the hand only after it has finished |
+| | `Placed Animation` | none | the **Open** animation (`AS_Sunbed_Open`). Plays when the prop is put down at the hologram spot |
+| | `Open Pose Animation`, `Closed Pose Animation` | none | optional one-frame poses: the starting pose, the snap target if the pickup is interrupted, and the pose of the placement hologram (open) |
 
-### 7.2 Animations when placed
+### 7.2 Animations when placed (Open / Close)
+
+**Where the files go.** The prop's **own** animations (`AS_Sunbed_Open`, `AS_Sunbed_Close` and the optional one-frame `AS_Sunbed_OpenPose`, `AS_Sunbed_ClosedPose`) go in the prop's mesh folder, **`Content/Mesh/Props/<Item>/`**, imported as **Animation** on the **prop's** skeleton (`SK_Sunbed_Skeleton`). Do not confuse them with the arms animations (`AS_Arms_<Item>_...`), which go in `Content/Animation/ArmsItems/Items/<Item>/` on `SK_Character` (`../../AnimationSystem/Engine_Setup_Guide.md`).
+
+**Setup, step by step.**
+
+1. Import the FBX as animations on the prop's skeleton into `Content/Mesh/Props/<Item>/`; check in the preview that the grip bone does not move.
+2. Open the prop Blueprint > Class Defaults > **Prop \| Animation**: **Picked Up Animation** = `AS_<Item>_Close`, **Placed Animation** = `AS_<Item>_Open`; optionally **Open Pose Animation** and **Closed Pose Animation**.
+3. **PropMesh** > Animation Mode = *Use Animation Asset*, no Animation Blueprint. Compile, save, test (section 8).
+
+Full explanation with the same steps: `../../SetupGuides/Unreal_Setup_Guide.md`, section 2.6.
 
 Two ways, use one:
 
-- **Simple:** set **Placed Animation** (for example `AS_Umbrella_Open`) and, if you want, **Picked Up Animation** (`AS_Umbrella_Close`). They play once when the prop is placed / grabbed, and the mesh stays in the last pose. These use a single animation on the mesh, so leave **PropMesh > Animation Mode** as *Use Animation Asset* (or no Animation Blueprint).
+- **Simple:** set **Placed Animation** (for example `AS_Umbrella_Open`) and **Picked Up Animation** (`AS_Umbrella_Close`). The flow:
+  - **Pickup (E):** the prop stays where it is only for an instant: it **plays Close while it flies to your hand** (position and rotation eased, following the hand as you move). The hand is occupied at the click and the prop's rest spots turn off at once. It snaps into the hand when the flight and Close have finished **and** the arms *Grab* animation has reached its commit point (the later of them). Pressing Q, Place or another grab during the flight attaches it at once, already closed.
+  - **Carried:** closed. A dropped or thrown prop lands closed and stays closed until placed; grabbing it again plays no Close.
+  - **Place:** at the arms commit point the prop leaves the hand and **flies to the hologram spot while it plays Open** (eased); it lands exactly on the hologram transform, and only then do its rest spots turn on. The placement hologram shows the prop **open**.
+  - Optional: **Open Pose Animation** / **Closed Pose Animation** (one frame each) make the start state, the interruption snap and the hologram independent of the mesh reference pose.
+  - These use a single animation on the mesh, so leave **PropMesh > Animation Mode** as *Use Animation Asset* (or no Animation Blueprint). The grip bone must not be keyed in them.
 - **Animation Blueprint:** give **PropMesh** an Animation Blueprint (Details > Animation) and drive it from the Blueprint events **On Grabbed**, **On Dropped**, **On Placed**, **On Thrown** (right-click in the Event Graph; they have the player as *Holder*). Leave the two animation assets empty.
 
 ### 7.3 Sunbeds and visitors
 
-Add **Sunset Cove Rest Spot** components to the Blueprint (children of **PropMesh** or the root). The character disables them while the prop is in your hands and enables them again when you **place** it (a dropped or thrown prop stays disabled until placed).
+Add **Sunset Cove Rest Spot** components to the Blueprint (children of **PropMesh** or the root). They are disabled from the moment you start picking the prop up (while it closes) and while it is in your hands, and enabled again when you **place** it (a dropped or thrown prop stays disabled until placed).
 
 ### 7.4 When Auto Fit is not what you want
 
@@ -268,6 +285,10 @@ Prop Inventory component values are editable while playing (select the character
 
 | I want... | Change |
 |---|---|
+| the prop to fly faster / slower to the hand | Prop Inventory: `Travel > Grab Travel Seconds` (it also lasts as long as the prop's Close animation) |
+| the prop to fly faster / slower to the placement spot | `Travel > Place Travel Seconds` (also at least as long as the Open animation) |
+| a softer or snappier start and arrival | `Travel > Travel Ease Exponent` (1 = constant speed, 2 = soft, higher = sharper) |
+| the old teleport back | `Travel > Travel To Hand` / `Travel To Placement` off |
 | a stronger / weaker throw | Prop Inventory: `Throw > Max Throw Speed` / `Min Throw Speed` |
 | the bar to charge faster / slower | `Throw > Charge Time To Peak` |
 | the bar to hold at the top instead of falling | `Throw > Ping Pong Charge` off |
@@ -300,7 +321,7 @@ Prop Inventory component values are editable while playing (select the character
 | Hologram looks like a gray grid | the hologram material lacks *Used with Skeletal Meshes* | section 6, step 3 |
 | Hologram is always red | no flat surface in range, an obstacle, or the prop's `Is Placement Blocked` returns true | lower `Max Surface Slope`, move, enable `Draw Debug` to see the box; if the beach is a single mesh try `Ignore Support Surface Actor` off |
 | Hologram is red only near rocks or walls | working as designed (obstacle box) | shrink with `Obstacle Box Shrink` |
-| The prop floats when placed | its animated mesh extends below the box, or `Collision Padding` is large | the placement uses the bounds of all components: lower the padding, check the mesh in the Blueprint viewport |
+| The prop floats when placed (or the hologram hovers) | the base of the prop is the bottom of its collision box (`CollisionBody`), fitted from the **reference pose** of the mesh. If the reference pose is not the open prop, or the mesh has a bone far below the sunbed, or `Collision Padding` is large, or Auto Fit is off with a too tall `Collision Box Extent`, the box bottom is not the sunbed bottom | open `BP_<Item>` and look at the box in the viewport: its bottom must touch the lowest point of the open prop. Fix the reference pose in Blender, or set `Collision Box Extent` by hand (Auto Fit off) |
 | A thrown prop does not fall | collision of the root altered in the Blueprint (the box must keep the `PhysicsActor` preset) | restore the preset on **CollisionBody** |
 | The throw hits me | `Release Pawn Ignore Seconds` too low for a big prop | raise it |
 | **Q** does something else (dodge) | the framework context binds Q | remap `IA_PropDrop` (section 4) |

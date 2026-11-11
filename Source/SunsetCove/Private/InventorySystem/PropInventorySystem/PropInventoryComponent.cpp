@@ -8,6 +8,7 @@
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
 #include "Core/Logging/SunsetCoveLog.h"
+#include "Core/Utils/SunsetCoveHeldItemUtils.h"
 #include "Core/Utils/SunsetCoveViewUtils.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
@@ -34,9 +35,11 @@ namespace
 
 UPropInventoryComponent::UPropInventoryComponent()
 {
-	// Ticks only while a placement or a throw charge is in progress (see SetState).
+	// Ticks only while a placement or a throw charge is in progress, or a prop is flying (see RefreshTickEnabled). It ticks after the
+	// arms animation has been evaluated, so a prop that flies to a hand socket aims at where the hand really is this frame.
 	PrimaryComponentTick.bCanEverTick = true;
 	PrimaryComponentTick.bStartWithTickEnabled = false;
+	PrimaryComponentTick.TickGroup = TG_PostPhysics;
 
 	Slots.SetNum(SlotCount);
 
@@ -62,6 +65,8 @@ void UPropInventoryComponent::BeginPlay()
 void UPropInventoryComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	CancelCurrentAction();
+	// A prop still flying lands at once, so the end of play never leaves one in the air with its collision off.
+	FinishAllPlaceFlights();
 	RestoreAllPawnResponses();
 
 	if (UInteractionComponent* InteractionComponent = Interaction.Get())
@@ -76,6 +81,9 @@ void UPropInventoryComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 void UPropInventoryComponent::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+
+	// Props in flight move first (also while the state is Idle).
+	UpdateFlights(DeltaTime);
 
 	if (State == EPropInventoryState::Idle)
 	{
@@ -321,7 +329,7 @@ bool UPropInventoryComponent::ValidatePropStructure(const AActor* Prop) const
 bool UPropInventoryComponent::TryGrabProp(AActor* Prop)
 {
 	// A new action applies the physical effect of the previous one first, so the slots and the world always agree.
-	CommitPendingAction();
+	FlushPendingAction();
 	PruneDestroyedProps();
 
 	if (!IsValid(Prop))
@@ -363,13 +371,32 @@ bool UPropInventoryComponent::TryGrabProp(AActor* Prop)
 	Primitive->SetSimulatePhysics(false);
 	Primitive->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 
-	// FUTURE (requested by the project owner): instead of attaching at once, the prop should travel toward the hand and attach
-	// to the socket when it arrives (see the notes at the top of PropInventoryComponent.h). CommitGrab is the place.
 	const EPropHand Hand = HandForSlotIndex(SlotIndex);
+	const FTransform StartTransform = Prop->GetActorTransform();
+
+	// The prop does what it needs before it can be carried (an umbrella closing where it lies) and says how long that takes. The
+	// attach waits for the later of that, the flight to the hand (GrabTravelSeconds) and the arms animation's commit point
+	// (BeginCommit), so nothing is ever cut short.
+	const float PrepareSeconds = FMath::Max(0.0f, IPropInterface::Execute_OnPropGrabStarted(Prop, GetOwner()));
+	const float FlightSeconds = bTravelToHand ? FMath::Max(PrepareSeconds, GrabTravelSeconds) : PrepareSeconds;
+
 	BeginCommit(EPropAction::Grab, Hand, Prop, [this, WeakProp = TWeakObjectPtr<AActor>(Prop), SlotIndex]()
 	{
 		CommitGrab(WeakProp, SlotIndex);
-	});
+	}, FlightSeconds);
+
+	// While the attach waits, the prop FLIES from where it lies to the hand (position and rotation). The target is the hand as it is
+	// each frame, so the flight follows the player. If the attach already happened (no wait), there is nothing to fly.
+	if (bTravelToHand && FlightSeconds > 0.0f && PendingCommit.bActive)
+	{
+		GrabFlight.Prop = Prop;
+		GrabFlight.Start = StartTransform;
+		GrabFlight.SlotIndex = SlotIndex;
+		GrabFlight.Elapsed = 0.0f;
+		GrabFlight.Duration = FlightSeconds;
+		GrabFlight.bActive = true;
+		RefreshTickEnabled();
+	}
 
 	// The hand is occupied from this moment, even while the prop has not reached the socket yet.
 	OnSlotsChanged.Broadcast();
@@ -378,6 +405,10 @@ bool UPropInventoryComponent::TryGrabProp(AActor* Prop)
 
 void UPropInventoryComponent::CommitGrab(TWeakObjectPtr<AActor> WeakProp, int32 SlotIndex)
 {
+	// The flight to the hand ends here, at the attach: the snap lands exactly where the flight was heading.
+	GrabFlight = FGrabFlight();
+	RefreshTickEnabled();
+
 	AActor* Prop = WeakProp.Get();
 	if (!IsValid(Prop) || !Slots.IsValidIndex(SlotIndex) || Slots[SlotIndex].Prop != Prop)
 	{
@@ -408,7 +439,9 @@ void UPropInventoryComponent::AttachPropToHand(AActor* Prop, int32 SlotIndex)
 	{
 		// Standard pipeline: snap to the socket, then the per-prop grip tweak relative to it.
 		Prop->AttachToComponent(HandMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
-		PropRoot->SetRelativeLocationAndRotation(HoldLocation, HoldRotation);
+		// The offset is in cm of the world; the hand socket space may be scaled (x100 arms), so it is divided by that scale.
+		const FVector SocketScale = HandMesh->GetSocketTransform(SocketName, RTS_World).GetScale3D();
+		PropRoot->SetRelativeLocationAndRotation(SunsetCoveHeldItem::WorldOffsetToRelative(HoldLocation, SocketScale), HoldRotation);
 		return;
 	}
 
@@ -425,7 +458,38 @@ void UPropInventoryComponent::AttachPropToHand(AActor* Prop, int32 SlotIndex)
 	const FTransform FallbackSocket(HandFallbackRotation, bRightHand ? RightHandFallbackLocation : LeftHandFallbackLocation);
 	const FTransform RootInSocket(HoldRotation, HoldLocation);
 	const FTransform RootInHandMesh = RootInSocket * FallbackSocket;
-	PropRoot->SetRelativeLocationAndRotation(RootInHandMesh.GetLocation(), RootInHandMesh.GetRotation());
+	PropRoot->SetRelativeLocationAndRotation(SunsetCoveHeldItem::WorldOffsetToRelative(RootInHandMesh.GetLocation(), HandMesh->GetComponentScale()), RootInHandMesh.GetRotation());
+}
+
+bool UPropInventoryComponent::ComputeHandTarget(AActor* Prop, int32 SlotIndex, FTransform& OutRootWorld) const
+{
+	const USceneComponent* HandMesh = ResolveHandMesh();
+	if (!IsValid(Prop) || !HandMesh)
+	{
+		return false;
+	}
+
+	// The same inputs as AttachPropToHand, so the end of the flight and the attach are the same transform.
+	const bool bRightHand = (SlotIndex == 0);
+	const FName SocketName = bRightHand ? RightHandSocketName : LeftHandSocketName;
+	const FVector HoldLocation = IPropInterface::Execute_GetPropHoldLocationOffset(Prop, bRightHand);
+	const FRotator HoldRotation = IPropInterface::Execute_GetPropHoldRotationOffset(Prop, bRightHand);
+
+	if (!SocketName.IsNone() && HandMesh->DoesSocketExist(SocketName))
+	{
+		// The grip offset is in cm of the world and is applied in the orientation of the socket (scale does not enter the world offset).
+		const FTransform Socket = HandMesh->GetSocketTransform(SocketName, RTS_World);
+		const FQuat SocketRotation = Socket.GetRotation();
+		OutRootWorld = FTransform(SocketRotation * HoldRotation.Quaternion(), Socket.GetLocation() + SocketRotation.RotateVector(HoldLocation));
+		return true;
+	}
+
+	// No socket: the fallback offset stands in for it, relative to the hand mesh component.
+	const FTransform FallbackSocket(HandFallbackRotation, bRightHand ? RightHandFallbackLocation : LeftHandFallbackLocation);
+	const FTransform RootInHandMesh = FTransform(HoldRotation, HoldLocation) * FallbackSocket;
+	const FQuat MeshRotation = HandMesh->GetComponentQuat();
+	OutRootWorld = FTransform(MeshRotation * RootInHandMesh.GetRotation(), HandMesh->GetComponentLocation() + MeshRotation.RotateVector(RootInHandMesh.GetLocation()));
+	return true;
 }
 
 void UPropInventoryComponent::ValidateHandSockets()
@@ -480,7 +544,7 @@ USceneComponent* UPropInventoryComponent::ResolveHandMesh() const
 
 bool UPropInventoryComponent::BeginPlacement()
 {
-	CommitPendingAction();
+	FlushPendingAction();
 	PruneDestroyedProps();
 
 	if (State != EPropInventoryState::Idle)
@@ -507,7 +571,17 @@ bool UPropInventoryComponent::BeginPlacement()
 	PlacementStartYaw = ViewRotation.Yaw;
 
 	// Footprint of the prop in its own (unscaled) space: used to rest it on the ground and to test for obstacles.
-	PropLocalBounds = Prop->CalculateComponentsBoundingBoxInLocalSpace(/*bNonColliding=*/true);
+	// The prop says what its footprint is when put down (its base must not depend on the pose it is carried in). If it does not say,
+	// the components are measured as they are now.
+	FBox DeclaredBounds(ForceInit);
+	if (IPropInterface::Execute_GetPropPlacementBounds(Prop, DeclaredBounds) && DeclaredBounds.IsValid)
+	{
+		PropLocalBounds = DeclaredBounds;
+	}
+	else
+	{
+		PropLocalBounds = Prop->CalculateComponentsBoundingBoxInLocalSpace(/*bNonColliding=*/true);
+	}
 	if (!PropLocalBounds.IsValid)
 	{
 		PropLocalBounds = FBox(FVector(-25.0f), FVector(25.0f));
@@ -744,11 +818,44 @@ void UPropInventoryComponent::CommitPlace(TWeakObjectPtr<AActor> WeakProp, EColl
 		return;
 	}
 
-	UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Prop->GetRootComponent());
-	ECollisionEnabled::Type RestoredCollision = SavedCollision;
-
+	// The prop leaves the hand where it is NOW (keeping its world transform): that is where its flight to the spot starts.
 	Prop->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
-	Prop->SetActorTransform(WorldTransform, /*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
+
+	FPlaceFlight Flight;
+	Flight.Prop = Prop;
+	Flight.Start = Prop->GetActorTransform();
+	Flight.Final = WorldTransform;
+	Flight.SavedCollision = SavedCollision;
+	Flight.Hand = Hand;
+
+	// The prop starts what it does on the way (the Open animation) and says how long it takes: the flight lasts at least that long, so
+	// the prop lands as it finishes opening. Collision and physics stay off until it lands (set at the grab).
+	const float PrepareSeconds = FMath::Max(0.0f, IPropInterface::Execute_OnPropPlaceStarted(Prop, GetOwner()));
+	Flight.Duration = bTravelToPlacement ? FMath::Max(PrepareSeconds, PlaceTravelSeconds) : 0.0f;
+
+	if (Flight.Duration <= 0.0f)
+	{
+		FinishPlaceFlight(Flight);
+		return;
+	}
+
+	PlaceFlights.Add(Flight);
+	RefreshTickEnabled();
+}
+
+void UPropInventoryComponent::FinishPlaceFlight(const FPlaceFlight& Flight)
+{
+	AActor* Prop = Flight.Prop.Get();
+	if (!IsValid(Prop))
+	{
+		return;
+	}
+
+	UPrimitiveComponent* Primitive = Cast<UPrimitiveComponent>(Prop->GetRootComponent());
+	ECollisionEnabled::Type RestoredCollision = Flight.SavedCollision;
+
+	// The landing: exactly the placement transform (it also carries the scale), then the world takes the prop back.
+	Prop->SetActorTransform(Flight.Final, /*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
 
 	if (Primitive)
 	{
@@ -767,8 +874,84 @@ void UPropInventoryComponent::CommitPlace(TWeakObjectPtr<AActor> WeakProp, EColl
 		}
 	}
 
+	// Landed: the character switches the rest spots on from OnPropAction(Place), so visitors never take a sunbed that is still flying.
 	IPropInterface::Execute_OnPropPlaced(Prop, GetOwner());
-	OnPropAction.Broadcast(EPropAction::Place, Hand, Prop);
+	OnPropAction.Broadcast(EPropAction::Place, Flight.Hand, Prop);
+}
+
+void UPropInventoryComponent::FinishAllPlaceFlights()
+{
+	// Copy first: landing broadcasts events, and a listener could start another action.
+	TArray<FPlaceFlight> Flights = MoveTemp(PlaceFlights);
+	PlaceFlights.Reset();
+	for (const FPlaceFlight& Flight : Flights)
+	{
+		FinishPlaceFlight(Flight);
+	}
+}
+
+float UPropInventoryComponent::EaseFlightAlpha(float Alpha) const
+{
+	return FMath::InterpEaseInOut(0.0f, 1.0f, FMath::Clamp(Alpha, 0.0f, 1.0f), FMath::Max(1.0f, TravelEaseExponent));
+}
+
+void UPropInventoryComponent::RefreshTickEnabled()
+{
+	// Per-frame work: a placement or a charge, a prop flying to the hand, props flying to their spot.
+	SetComponentTickEnabled(State != EPropInventoryState::Idle || GrabFlight.bActive || PlaceFlights.Num() > 0);
+}
+
+void UPropInventoryComponent::UpdateFlights(float DeltaTime)
+{
+	// ---- To the hand ----
+	if (GrabFlight.bActive)
+	{
+		AActor* Prop = GrabFlight.Prop.Get();
+		FTransform Target;
+		if (!IsValid(Prop) || !Slots.IsValidIndex(GrabFlight.SlotIndex) || Slots[GrabFlight.SlotIndex].Prop != Prop || !ComputeHandTarget(Prop, GrabFlight.SlotIndex, Target))
+		{
+			GrabFlight = FGrabFlight();
+		}
+		else
+		{
+			GrabFlight.Elapsed += DeltaTime;
+			const float Alpha = EaseFlightAlpha(GrabFlight.Duration > 0.0f ? GrabFlight.Elapsed / GrabFlight.Duration : 1.0f);
+			Prop->SetActorLocationAndRotation(
+				FMath::Lerp(GrabFlight.Start.GetLocation(), Target.GetLocation(), Alpha),
+				FQuat::Slerp(GrabFlight.Start.GetRotation(), Target.GetRotation(), Alpha),
+				/*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
+		}
+	}
+
+	// ---- To the placement spot ----
+	for (int32 Index = PlaceFlights.Num() - 1; Index >= 0; --Index)
+	{
+		FPlaceFlight& Flight = PlaceFlights[Index];
+		AActor* Prop = Flight.Prop.Get();
+		if (!IsValid(Prop))
+		{
+			PlaceFlights.RemoveAtSwap(Index);
+			continue;
+		}
+
+		Flight.Elapsed += DeltaTime;
+		if (Flight.Elapsed >= Flight.Duration)
+		{
+			// Remove before landing: the landing broadcasts events.
+			const FPlaceFlight Landed = Flight;
+			PlaceFlights.RemoveAtSwap(Index);
+			FinishPlaceFlight(Landed);
+			continue;
+		}
+
+		const float Alpha = EaseFlightAlpha(Flight.Elapsed / Flight.Duration);
+		Prop->SetActorLocationAndRotation(
+			FMath::Lerp(Flight.Start.GetLocation(), Flight.Final.GetLocation(), Alpha),
+			FQuat::Slerp(Flight.Start.GetRotation(), Flight.Final.GetRotation(), Alpha),
+			/*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
+	}
+
+	RefreshTickEnabled();
 }
 
 // ----------------------------------------------------------------------
@@ -777,7 +960,7 @@ void UPropInventoryComponent::CommitPlace(TWeakObjectPtr<AActor> WeakProp, EColl
 
 bool UPropInventoryComponent::BeginThrowCharge()
 {
-	CommitPendingAction();
+	FlushPendingAction();
 	PruneDestroyedProps();
 
 	// Throw wins over a placement in progress: the placement ends without placing, the charge starts.
@@ -940,6 +1123,21 @@ void UPropInventoryComponent::CommitRelease(TWeakObjectPtr<AActor> WeakProp, ECo
 
 	Prop->DetachFromActor(FDetachmentTransformRules::KeepWorldTransform);
 
+	// A DROPPED prop lands in its resting orientation (a sunbed flat, an umbrella standing), not in the tilt it had in the hand.
+	// A thrown one keeps the rotation of the hand and tumbles.
+	if (Action == EPropAction::Drop)
+	{
+		FVector DropViewLocation;
+		FRotator DropViewRotation;
+		SunsetCoveView::GetOwnerViewPoint(GetOwner(), DropViewLocation, DropViewRotation);
+
+		FQuat DropRotation;
+		if (IPropInterface::Execute_GetPropDropRotation(Prop, DropViewRotation.Yaw, DropRotation))
+		{
+			Prop->SetActorRotation(DropRotation, ETeleportType::TeleportPhysics);
+		}
+	}
+
 	// If a wall is between the camera and the hand, release the prop in front of the wall, not inside it.
 	if (UWorld* World = GetWorld())
 	{
@@ -985,10 +1183,10 @@ void UPropInventoryComponent::CommitRelease(TWeakObjectPtr<AActor> WeakProp, ECo
 // Commit timing
 // ----------------------------------------------------------------------
 
-void UPropInventoryComponent::BeginCommit(EPropAction Action, EPropHand Hand, AActor* Prop, TFunction<void()> Commit)
+void UPropInventoryComponent::BeginCommit(EPropAction Action, EPropHand Hand, AActor* Prop, TFunction<void()> Commit, float MinWaitSeconds)
 {
 	// Never two pending effects: the caller flushed the previous one, this is only a guard.
-	CommitPendingAction();
+	FlushPendingAction();
 
 	FActionCommitTiming Timing;
 	if (ActionBeginHook.IsBound())
@@ -1007,6 +1205,11 @@ void UPropInventoryComponent::BeginCommit(EPropAction Action, EPropHand Hand, AA
 		WaitSeconds = Timing.TimeoutSeconds;
 	}
 
+	// The prop itself may need time (its Close animation). That is a floor: whatever the animation hook asked, the effect never
+	// happens before it. Immediate becomes a delay, a delay and a notify timeout are raised to it.
+	MinWaitSeconds = FMath::Max(0.0f, MinWaitSeconds);
+	WaitSeconds = FMath::Max(WaitSeconds, MinWaitSeconds);
+
 	if (!World || WaitSeconds <= 0.0f)
 	{
 		Commit();
@@ -1015,10 +1218,34 @@ void UPropInventoryComponent::BeginCommit(EPropAction Action, EPropHand Hand, AA
 
 	PendingCommit.Commit = MoveTemp(Commit);
 	PendingCommit.bActive = true;
-	World->GetTimerManager().SetTimer(PendingCommit.Timer, FTimerDelegate::CreateUObject(this, &UPropInventoryComponent::CommitPendingAction), WaitSeconds, /*bLoop=*/false);
+	PendingCommit.EarliestTime = MinWaitSeconds > 0.0f ? World->GetTimeSeconds() + MinWaitSeconds : 0.0;
+	World->GetTimerManager().SetTimer(PendingCommit.Timer, FTimerDelegate::CreateUObject(this, &UPropInventoryComponent::FlushPendingAction), WaitSeconds, /*bLoop=*/false);
 }
 
 void UPropInventoryComponent::CommitPendingAction()
+{
+	if (!PendingCommit.bActive)
+	{
+		return;
+	}
+
+	// The release of a notify. If the prop still needs time (it is closing), the effect waits for it: the notify can end the wait,
+	// never shorten the prop's own animation. A flush (a new action, cancel, end of play) does not wait: FlushPendingAction.
+	UWorld* World = GetWorld();
+	if (World && PendingCommit.EarliestTime > 0.0)
+	{
+		const double Remaining = PendingCommit.EarliestTime - World->GetTimeSeconds();
+		if (Remaining > UE_KINDA_SMALL_NUMBER)
+		{
+			World->GetTimerManager().SetTimer(PendingCommit.Timer, FTimerDelegate::CreateUObject(this, &UPropInventoryComponent::FlushPendingAction), static_cast<float>(Remaining), /*bLoop=*/false);
+			return;
+		}
+	}
+
+	FlushPendingAction();
+}
+
+void UPropInventoryComponent::FlushPendingAction()
 {
 	if (!PendingCommit.bActive)
 	{
@@ -1047,7 +1274,7 @@ void UPropInventoryComponent::CommitPendingAction()
 void UPropInventoryComponent::CancelCurrentAction()
 {
 	// A pending physical effect cannot outlive the action that asked for it (cancel, end of play, unpossess).
-	CommitPendingAction();
+	FlushPendingAction();
 
 	switch (State)
 	{
@@ -1263,8 +1490,8 @@ void UPropInventoryComponent::SetState(EPropInventoryState NewState)
 	const EPropInventoryState OldState = State;
 	State = NewState;
 
-	// Idle needs no per-frame work.
-	SetComponentTickEnabled(State != EPropInventoryState::Idle);
+	// Idle needs no per-frame work, unless a prop is flying.
+	RefreshTickEnabled();
 
 	OnStateChanged.Broadcast(NewState, OldState);
 }

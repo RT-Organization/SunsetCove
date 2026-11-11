@@ -154,10 +154,20 @@ La **posa di riferimento** (rest pose) del prop è **il prop APERTO / PIAZZATO**
 
 | File | Quando parte | Note |
 |---|---|---|
-| `AS_<Prop>_Close` | il giocatore prende il prop | da aperto a **chiuso**. Finisce nella posa chiusa e **resta lì** mentre è in mano |
-| `AS_<Prop>_Open` | il giocatore lo piazza a terra | da chiuso a **aperto**. Finisce nella posa di riferimento |
+| `AS_<Prop>_Close` | il giocatore prende il prop | da aperto a **chiuso**. Parte **a terra, dove si trova il prop**, e il prop si attacca alla mano **solo quando l'animazione è finita**. Finisce nella posa chiusa e **resta lì** mentre è in mano |
+| `AS_<Prop>_Open` | il giocatore lo piazza a terra | da chiuso a **aperto**. Parte quando il prop appare nel punto scelto. Finisce nella posa di riferimento |
 
 Esempi: `AS_Sunbed_Close`, `AS_Sunbed_Open`, `AS_Umbrella_Close`, `AS_Umbrella_Open`.
+
+**La durata di `Close` decide quanto aspetta il gioco** prima di mettere il prop in mano (il prop si attacca quando sono finite sia `Close` sia l'animazione delle braccia `Grab`, la più lunga delle due). Quindi tienila **breve e leggibile** (circa 0,3–0,6 s) e falla durare **come `AS_Arms_<Prop>_Grab_R/L`**.
+
+Un prop **lasciato cadere (Q) o lanciato resta chiuso** finché non viene piazzato: quando lo si riprende, `Close` non parte (è già chiuso).
+
+**Il prop ora vola** (nessuna impostazione da fare per l'animatore): quando lo si prende, mentre parte `Close` il prop **vola** dal punto in cui si trova fino alla mano; quando lo si piazza, esce dalla mano e **vola** fino al punto scelto mentre parte `Open`. La durata del volo è **la più lunga tra un minimo (circa 0,4 s) e la durata di `Close` / `Open`**: per questo vanno tenute sui **0,3–0,5 s**. Il prop atterra esattamente dove era l'ologramma e solo allora diventa utilizzabile dai visitatori.
+
+**Pose facoltative** (un solo fotogramma ciascuna): `AS_<Prop>_ClosedPose` (prop chiuso) e `AS_<Prop>_OpenPose` (prop aperto). Il gioco le usa solo per: l'ologramma di piazzamento (che deve mostrare il prop **aperto**), la posa di partenza del prop nel livello e per mettere il prop subito nella posa giusta se l'azione viene interrotta (per esempio premendo Q mentre si chiude). Se non ci sono, il gioco funziona lo stesso (la posa di riferimento è quella aperta).
+
+In `Close`, `Open` e nelle pose l'osso `Grip_R` / `Grip_L` **non deve avere chiavi**: il gioco ne legge la posizione quando il prop viene preso.
 
 ---
 
@@ -331,7 +341,7 @@ Solo se le vuoi: il menu radiale (Tab tenuto) è lo stesso per tutti.
 
 | Nome | Tipo | Quando | Pr. |
 |---|---|---|---|
-| `AS_Sunbed_Close`, `AS_Umbrella_Close` | Una volta (finisce **chiuso**) | il prop viene preso | A |
+| `AS_Sunbed_Close`, `AS_Umbrella_Close` | Una volta (finisce **chiuso**) | il prop viene preso (parte a terra, poi il prop va in mano) | A |
 | `AS_Sunbed_Open`, `AS_Umbrella_Open` | Una volta (finisce **aperto**) | il prop viene piazzato | A |
 | `AS_Bucket_Equip`, `AS_Spray_Equip`, `AS_Toy_Equip` | Una volta | lo strumento viene tirato fuori | B |
 | `AS_Bucket_Use`, `AS_Spray_Use`, `AS_Toy_Use` | Una volta | a ogni uso | B |

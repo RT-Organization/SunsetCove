@@ -9,6 +9,7 @@
 #include "Core/Logging/SunsetCoveLog.h"
 #include "Core/Utils/SunsetCoveHeldItemUtils.h"
 #include "Engine/SkeletalMesh.h"
+#include "Gameplay/RestSpots/SunsetCoveRestSpotComponent.h"
 
 ASunsetCoveProp::ASunsetCoveProp()
 {
@@ -57,6 +58,11 @@ void ASunsetCoveProp::BeginPlay()
 	{
 		CollisionBody->SetSimulatePhysics(bStartSimulatingPhysics);
 	}
+
+	// A prop in the level lies open. With an open pose asset the start does not depend on the reference pose of the mesh.
+	bIsOpen = true;
+	bIsClosing = false;
+	ApplyPose(OpenPoseAnimation, /*bLastFrame=*/false);
 
 	ValidateSetup();
 }
@@ -175,9 +181,106 @@ FName ASunsetCoveProp::GetItemId_Implementation() const
 	return FName(*Name);
 }
 
+bool ASunsetCoveProp::GetPropDropRotation_Implementation(float ViewYaw, FQuat& OutRotation) const
+{
+	if (!bDropUpright)
+	{
+		return false;
+	}
+
+	// Upright (only the heading), then the per-prop offset in the prop's own space.
+	OutRotation = FRotator(0.0f, ViewYaw, 0.0f).Quaternion() * DropRotationOffset.Quaternion();
+	return true;
+}
+
+bool ASunsetCoveProp::GetPropPlacementBounds_Implementation(FBox& OutLocalBounds) const
+{
+	if (!CollisionBody)
+	{
+		return false;
+	}
+
+	// The base of the prop is the bottom of its collision box. The box is fitted once, from the reference (open) pose of the mesh, so
+	// it does not depend on the pose the prop is carried in. The padding that makes the box easier to aim at is not part of the prop:
+	// it is taken off, so the prop stands ON the ground and not a little above it. The root is the center of the box.
+	FVector Extent = CollisionBody->GetUnscaledBoxExtent();
+	if (bAutoFitCollisionToMesh)
+	{
+		Extent -= FVector(CollisionPadding);
+	}
+	Extent = Extent.ComponentMax(FVector(1.0f));
+
+	OutLocalBounds = FBox(-Extent, Extent);
+	return true;
+}
+
+bool ASunsetCoveProp::GetPropPlacementPreviewPose_Implementation(UAnimationAsset*& OutAsset, float& OutTime) const
+{
+	// The hologram shows the prop as it will be once put down: open. The prop itself is closed while it is carried.
+	if (OpenPoseAnimation)
+	{
+		OutAsset = OpenPoseAnimation;
+		OutTime = 0.0f;
+		return true;
+	}
+
+	if (PlacedAnimation)
+	{
+		OutAsset = PlacedAnimation;
+		OutTime = GetAnimationLength(PlacedAnimation);
+		return true;
+	}
+
+	return false;
+}
+
+float ASunsetCoveProp::OnPropGrabStarted_Implementation(AActor* Holder)
+{
+	// The pickup is a LOGICAL fact from now on: visitors must stop using the prop while it closes, so its rest spots go off here
+	// and not at the attach. (The character also switches them off at the attach: harmless, and it enables them again on Place.)
+	TInlineComponentArray<USunsetCoveRestSpotComponent*> RestSpots(this);
+	for (USunsetCoveRestSpotComponent* RestSpot : RestSpots)
+	{
+		if (RestSpot)
+		{
+			RestSpot->SetSpotEnabled(false);
+		}
+	}
+
+	float WaitSeconds = 0.0f;
+
+	// A prop that is already closed (it was dropped or thrown) has nothing to close: it is attached at once.
+	if (bIsOpen)
+	{
+		bIsOpen = false;
+
+		const float CloseLength = GetAnimationLength(PickedUpAnimation);
+		if (PropMesh && PickedUpAnimation && CloseLength > 0.0f)
+		{
+			PlayOptionalAnimation(PickedUpAnimation);
+			bIsClosing = true;
+			WaitSeconds = CloseLength;
+		}
+		else
+		{
+			// No Close animation: the prop is simply closed (the pose asset, if there is one) and carried at once.
+			ApplyPose(ClosedPoseAnimation, /*bLastFrame=*/true);
+		}
+	}
+
+	BP_OnGrabStarted(Holder);
+	return WaitSeconds;
+}
+
 void ASunsetCoveProp::OnPropGrabbed_Implementation(AActor* Holder)
 {
-	PlayOptionalAnimation(PickedUpAnimation);
+	// Whatever happened (the Close ended, or an interruption flushed the pickup in the middle of it) the prop is carried closed.
+	if (bIsClosing)
+	{
+		bIsClosing = false;
+		ApplyPose(ClosedPoseAnimation ? ClosedPoseAnimation.Get() : PickedUpAnimation.Get(), /*bLastFrame=*/true);
+	}
+
 	BP_OnGrabbed(Holder);
 }
 
@@ -186,9 +289,36 @@ void ASunsetCoveProp::OnPropDropped_Implementation(AActor* Holder)
 	BP_OnDropped(Holder);
 }
 
+float ASunsetCoveProp::OnPropPlaceStarted_Implementation(AActor* Holder)
+{
+	// The prop left the hand and flies to the placement spot: it opens WHILE it flies. (A prop that was never closed, because it has no
+	// animations, has nothing to open.) The length is what the flight must last at least, so the prop lands as it finishes opening.
+	float WaitSeconds = 0.0f;
+
+	if (!bIsOpen)
+	{
+		bIsOpen = true;
+		bIsClosing = false;
+
+		const float OpenLength = GetAnimationLength(PlacedAnimation);
+		if (PropMesh && PlacedAnimation && OpenLength > 0.0f)
+		{
+			PlayOptionalAnimation(PlacedAnimation);
+			WaitSeconds = OpenLength;
+		}
+		else
+		{
+			ApplyPose(OpenPoseAnimation, /*bLastFrame=*/false);
+		}
+	}
+
+	BP_OnPlaceStarted(Holder);
+	return WaitSeconds;
+}
+
 void ASunsetCoveProp::OnPropPlaced_Implementation(AActor* Holder)
 {
-	PlayOptionalAnimation(PlacedAnimation);
+	// Landed at the hologram spot. (The Open animation started when the flight started: OnPropPlaceStarted.)
 	BP_OnPlaced(Holder);
 }
 
@@ -203,4 +333,22 @@ void ASunsetCoveProp::PlayOptionalAnimation(UAnimationAsset* Animation) const
 	{
 		PropMesh->PlayAnimation(Animation, /*bLooping=*/false);
 	}
+}
+
+void ASunsetCoveProp::ApplyPose(UAnimationAsset* Pose, bool bLastFrame) const
+{
+	if (!PropMesh || !Pose)
+	{
+		return;
+	}
+
+	// A single animation node, stopped on the wanted frame: the pose is held, nothing plays.
+	PropMesh->PlayAnimation(Pose, /*bLooping=*/false);
+	PropMesh->SetPosition(bLastFrame ? GetAnimationLength(Pose) : 0.0f, /*bFireNotifies=*/false);
+	PropMesh->Stop();
+}
+
+float ASunsetCoveProp::GetAnimationLength(const UAnimationAsset* Animation)
+{
+	return Animation ? Animation->GetPlayLength() : 0.0f;
 }

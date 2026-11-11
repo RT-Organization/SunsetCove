@@ -5,7 +5,7 @@
 //   The brain of a visitor, as a component on its body (BP_Visitor = ASunsetCoveNPCCharacter + this component). It runs
 //   the Miro flow "COMMON CASE TO PROTOTYPE NAVIGATION":
 //     spawned at the hidden end of the sandy path -> walks to the barrier ("Approach Entrance") -> goes in (paying
-//     comes later) -> claims a rest spot it likes, sunbed, umbrella or free sand, and walks there ("Walk to desired rest
+//     comes later) -> claims a rest spot it likes, the sunbed, and walks there ("Walk to desired rest
 //     position") -> sits or lies down ("Rest") -> stays until the shift is over ("SHIFT OVER") -> walks back down the
 //     path ("Leave Cove") -> removed at the exit, out of the player's sight.
 //   On the Miro NPC model this is the "Thinking" layer: picking, pathfinding, updating and recalculating. The body
@@ -36,8 +36,8 @@
 //   random delay of up to LeaveDelayMax seconds, so the whole beach does not jam the path at once.
 //
 // SETUP (BP_Visitor, Components panel: add "Sunset Cove Visitor", then its Details)
-//   Spot Type Weights: how much this visitor type wants each kind of spot (Cove.Spot.*), for example Sunbed 3,
-//   Umbrella 2, Sand 2. Everything else has working defaults.
+//   Spot Type Weights: how much this visitor type wants each kind of spot (Cove.Spot.*), for example Sunbed 3 (the only kind today).
+//   Everything else has working defaults.
 //
 // DEBUG
 //   Console: SunsetCove.Debug.Visitors 1 writes each visitor's phase above its head and draws its current goal.

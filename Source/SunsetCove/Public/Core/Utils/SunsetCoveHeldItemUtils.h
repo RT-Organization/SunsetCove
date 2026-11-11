@@ -48,6 +48,19 @@ namespace SunsetCoveHeldItem
 	}
 
 	/**
+	 * A location given in WORLD units (cm) turned into the location to set RELATIVE to a parent whose space is scaled.
+	 * Why: the arms come from Blender with scaled bones (the hand socket space can be x100). A child attached with
+	 * "SnapToTargetNotIncludingScale" keeps its own WORLD scale, so its relative scale becomes 0.01, but a RELATIVE location is
+	 * still multiplied by the parent scale: an offset of 27 cm would become 27 m. Dividing by the parent scale makes the offset
+	 * come out in cm in the world, whatever the scale of the hand chain is.
+	 */
+	inline FVector WorldOffsetToRelative(const FVector& WorldOffset, const FVector& ParentScale)
+	{
+		auto Safe = [](double Scale) { return FMath::Abs(Scale) > UE_KINDA_SMALL_NUMBER ? Scale : 1.0; };
+		return FVector(WorldOffset.X / Safe(ParentScale.X), WorldOffset.Y / Safe(ParentScale.Y), WorldOffset.Z / Safe(ParentScale.Z));
+	}
+
+	/**
 	 * Box that wraps the skeletal mesh, for the root collision box. The root is the CENTER of the box (it is also the point
 	 * physics turns the item around), so the mesh has to be moved until its own center is on the root.
 	 * @param OutBoxExtent            Half size of the box (cm), with Padding added on every side.

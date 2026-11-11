@@ -1,9 +1,9 @@
 // SunsetCoveRestSpotComponent.h
-// SunsetCove - Gameplay area (RestSpots). One place where one visitor can rest: a sunbed, a seat under an umbrella, a
-// patch of sand.
+// SunsetCove - Gameplay area (RestSpots). One place where one visitor can rest: a sunbed (the only kind of rest spot for now;
+// umbrellas are not rest spots, they will organize the stations).
 //
 // WHAT THIS CLASS IS
-//   A marker that any prop Blueprint can carry (a sunbed has one, an umbrella two, a towel one). Its transform says where
+//   A marker that any prop Blueprint can carry (a sunbed has one). Its transform says where
 //   the visitor's FEET go while resting (on a sunbed: on the mattress) and which way the visitor faces (its X axis).
 //   It registers itself with USunsetCoveRestSpotSubsystem at BeginPlay; visitors ask that subsystem for free spots.
 //
@@ -53,11 +53,11 @@ public:
 	// Configuration (on the prop Blueprint, or on a placed instance)
 	// ------------------------------------------------------------------
 
-	/** What kind of place this is (Cove.Spot.Sunbed, Cove.Spot.Umbrella, Cove.Spot.Sand). Visitors want some kinds more. */
+	/** What kind of place this is (today only Cove.Spot.Sunbed). Visitors want some kinds more. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SunsetCove|RestSpot", meta = (Categories = "Cove.Spot"))
 	FGameplayTag SpotType;
 
-	/** What a visitor does here (NPC.Activity.Rest.Sit, .Lay, .Stand). One is picked at random on every visit. */
+	/** What a visitor does here (NPC.Activity.Rest.Lay, .Sit). One is picked at random on every visit. */
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "SunsetCove|RestSpot", meta = (Categories = "NPC.Activity"))
 	FGameplayTagContainer RestActivities;
 

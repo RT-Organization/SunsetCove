@@ -5,8 +5,9 @@
 //   A transient actor with no collision. UPropInventoryComponent spawns one when the player starts placing a prop and
 //   destroys it when the placement ends. It copies the look of the prop (every static and skeletal mesh component, with
 //   the same placement relative to the prop root, so a prop made of several meshes is copied whole; a skeletal copy
-//   follows the pose of the original) and shows it with the hologram material, tinted green when the spot is valid
-//   and red when it is not.
+//   shows the pose the prop asks for with IPropInterface::GetPropPlacementPreviewPose, which is the OPEN pose for a prop
+//   that is carried folded, or else follows the pose of the original) and shows it with the hologram material, tinted
+//   green when the spot is valid and red when it is not.
 //
 // WITHOUT A HOLOGRAM MATERIAL
 //   If the component has no HologramMaterial, the copy keeps the materials of the prop and cannot be tinted. Validity is

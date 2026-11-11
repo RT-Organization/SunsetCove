@@ -8,6 +8,7 @@
 #include "Components/PrimitiveComponent.h"
 #include "Components/SceneComponent.h"
 #include "Core/Logging/SunsetCoveLog.h"
+#include "Core/Utils/SunsetCoveHeldItemUtils.h"
 #include "Core/Utils/SunsetCoveViewUtils.h"
 #include "Engine/World.h"
 #include "EnhancedInputComponent.h"
@@ -351,7 +352,9 @@ void UToolInventoryComponent::AttachToolToHand(ASunsetCoveTool* Tool)
 	if (!SocketName.IsNone())
 	{
 		Tool->AttachToComponent(HandMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale, SocketName);
-		ToolRoot->SetRelativeLocationAndRotation(RootInSocket.GetLocation(), RootInSocket.GetRotation());
+		// The offset is in cm of the world; the hand socket space may be scaled (x100 arms), so it is divided by that scale.
+		const FVector SocketScale = HandMesh->GetSocketTransform(SocketName, RTS_World).GetScale3D();
+		ToolRoot->SetRelativeLocationAndRotation(SunsetCoveHeldItem::WorldOffsetToRelative(RootInSocket.GetLocation(), SocketScale), RootInSocket.GetRotation());
 		return;
 	}
 
@@ -367,7 +370,7 @@ void UToolInventoryComponent::AttachToolToHand(ASunsetCoveTool* Tool)
 	Tool->AttachToComponent(HandMesh, FAttachmentTransformRules::SnapToTargetNotIncludingScale);
 	const FTransform FallbackSocket(FallbackRotation, FallbackLocation);
 	const FTransform RootInHandMesh = RootInSocket * FallbackSocket;
-	ToolRoot->SetRelativeLocationAndRotation(RootInHandMesh.GetLocation(), RootInHandMesh.GetRotation());
+	ToolRoot->SetRelativeLocationAndRotation(SunsetCoveHeldItem::WorldOffsetToRelative(RootInHandMesh.GetLocation(), HandMesh->GetComponentScale()), RootInHandMesh.GetRotation());
 }
 
 FName UToolInventoryComponent::ResolveToolSocket(const USceneComponent* HandMesh) const

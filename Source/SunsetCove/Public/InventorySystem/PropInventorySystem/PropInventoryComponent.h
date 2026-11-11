@@ -27,11 +27,11 @@
 //   Idle -> Placing (Place pressed) -> Idle (Place released, or cancelled)
 //   Idle -> ChargingThrow (Throw pressed) -> Idle (Throw released, or cancelled)
 //   Throw pressed while Placing cancels the placement and starts the charge. Drop cancels whatever is in progress and
-//   drops the active prop. Grab is refused unless the state is Idle. The component ticks only while it is not Idle.
+//   drops the active prop. Grab is refused unless the state is Idle. The component ticks only while it is not Idle or a prop is flying.
 //
 // HOW A PROP IS HELD, THROWN AND PLACED
-//   Grab:   physics off, collision off, AttachToComponent on the hand socket (Prop_R / Prop_L on the arms skeleton).
-//   Place:  detach, move to the hologram transform, restore collision, physics off (bSimulatePhysicsAfterPlace).
+//   Grab:   physics off, collision off, the prop flies to the hand, then AttachToComponent on the hand socket (Prop_R / Prop_L on the arms skeleton).
+//   Place:  detach, fly to the hologram transform, then restore collision, physics off (bSimulatePhysicsAfterPlace).
 //   Throw / Drop: detach, collision back on (with physics), physics on, velocity set directly (mass independent).
 //   For a short time after leaving the hand the prop ignores the Pawn channel, so it does not hit the thrower.
 //
@@ -43,10 +43,21 @@
 //   A new action, CancelCurrentAction, EndPlay and the unpossess flush a pending effect at once. CommitPendingAction() lets the
 //   animation (a notify) release an OnNotify wait. See Core/Utils/SunsetCoveActionCommit.h.
 //
-// FUTURE (requested by the project owner, not done yet): the prop must not teleport to the hand. On a Grab it should TRAVEL
-//   toward the hand (a short move of the prop) and attach to the socket when it arrives. The place to do it is CommitGrab: the
-//   logical grab has already happened, so a travel can run between the hook (animation starts) and the attach. Same idea for the
-//   Pickup of the Tool Inventory.
+// THE PROP'S OWN PREPARATION (a sunbed closing where it lies)
+//   When a Grab is accepted the prop is asked (IPropInterface::OnPropGrabStarted) to start what it needs before it can be carried
+//   and to say how many seconds that takes. That time is a FLOOR for the commit: the prop is attached at the LATER of that and the
+//   arms animation's commit point. A notify that comes earlier waits (CommitPendingAction); a new action, a cancel or the end of
+//   play apply the attach at once (FlushPendingAction), and the prop snaps to its final carried pose.
+//
+// TRAVEL (the prop flies, it does not teleport; PropInventory|Travel)
+//   Grab    The prop flies from where it lies to the hand (position and rotation, eased) while it closes. The target is the hand as it
+//           is each frame (ComputeHandTarget, the same transform AttachPropToHand produces, so the final snap does not pop). The flight
+//           is as long as the later of GrabTravelSeconds and the prop's own Close; the attach still waits for the arms commit point.
+//   Place   At the commit the prop detaches where the hand is and flies to the placement spot while it opens (OnPropPlaceStarted
+//           returns the length of Open). It LANDS at the end: collision and physics come back, OnPropPlaced and OnPropAction(Place)
+//           fire (the character switches the rest spots on). Several props can fly at once. The end of play lands them at once.
+//   Both can be turned off (bTravelToHand, bTravelToPlacement): then the prop teleports as before. The Pickup of the Tool Inventory
+//   does not fly yet; the same idea can be reused there.
 //
 // HOOKS FOR LATER WORK (nothing here needs changing to add them)
 //   UI         OnThrowChargeChanged (0..1) feeds the charge bar; OnStateChanged shows and hides it.
@@ -150,6 +161,30 @@ public:
 	/** Fallback rotation of a prop relative to the hand mesh component, both hands. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Hands")
 	FRotator HandFallbackRotation = FRotator::ZeroRotator;
+
+	// ------------------------------------------------------------------
+	// Configuration: travel (the prop flies to the hand and to the placement spot)
+	// ------------------------------------------------------------------
+
+	/** True: a grabbed prop FLIES from where it lies to the hand. False: it waits where it is and snaps to the hand. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Travel")
+	bool bTravelToHand = true;
+
+	/** True: a placed prop FLIES from the hand to the placement spot. False: it appears at the spot. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Travel")
+	bool bTravelToPlacement = true;
+
+	/** Seconds the flight to the hand lasts at least. It also lasts as long as the prop's own Close animation, and the prop is attached at the later of that and the arms Grab commit point. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Travel", meta = (ClampMin = "0.0", Units = "s", EditCondition = "bTravelToHand"))
+	float GrabTravelSeconds = 0.35f;
+
+	/** Seconds the flight to the placement spot lasts at least. It also lasts as long as the prop's own Open animation. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Travel", meta = (ClampMin = "0.0", Units = "s", EditCondition = "bTravelToPlacement"))
+	float PlaceTravelSeconds = 0.4f;
+
+	/** Ease of both flights: 1 = constant speed, 2 = soft start and soft arrival, higher = sharper. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Travel", meta = (ClampMin = "1.0", ClampMax = "6.0"))
+	float TravelEaseExponent = 2.0f;
 
 	// ------------------------------------------------------------------
 	// Configuration: placement
@@ -342,8 +377,10 @@ public:
 	void CancelCurrentAction();
 
 	/**
-	 * Applies the pending physical effect now (the prop attaches, detaches or launches). The arms animation calls it from its commit
-	 * notify. Does nothing if nothing is pending. Safe to call at any time.
+	 * Releases the wait of the pending physical effect (the prop attaches, detaches or launches). The arms animation calls it from its
+	 * commit notify. If the prop itself still needs time (a Grab while the prop closes, see IPropInterface::OnPropGrabStarted) the
+	 * effect happens when that time is over, never before. Does nothing if nothing is pending. Safe to call at any time.
+	 * A new action, CancelCurrentAction and EndPlay do NOT wait: they apply the effect at once (FlushPendingAction).
 	 */
 	UFUNCTION(BlueprintCallable, Category = "PropInventory")
 	void CommitPendingAction();
@@ -448,6 +485,46 @@ private:
 	/** Logs once, at start, which hand sockets are missing on the hand mesh (so a wrong name is found before the first grab). */
 	void ValidateHandSockets();
 	void AttachPropToHand(AActor* Prop, int32 SlotIndex);
+	/** Where the ROOT of the prop is in the world once it is attached to the hand of SlotIndex (the grip on the socket). The flight to the hand aims at it. */
+	bool ComputeHandTarget(AActor* Prop, int32 SlotIndex, FTransform& OutRootWorld) const;
+
+	// ---- Flights (travel to the hand, travel to the placement spot) ----
+	/** The grab in progress: the prop flies from Start to the hand while it waits for its commit. One at a time, like the pending commit. */
+	struct FGrabFlight
+	{
+		TWeakObjectPtr<AActor> Prop;
+		FTransform Start;
+		int32 SlotIndex = INDEX_NONE;
+		float Elapsed = 0.0f;
+		float Duration = 0.0f;
+		bool bActive = false;
+	};
+
+	/** A placed prop on its way from the hand to the placement spot. Several can fly at once (place with one hand, grab with the other). */
+	struct FPlaceFlight
+	{
+		TWeakObjectPtr<AActor> Prop;
+		FTransform Start;
+		FTransform Final;
+		ECollisionEnabled::Type SavedCollision = ECollisionEnabled::QueryAndPhysics;
+		EPropHand Hand = EPropHand::Right;
+		float Elapsed = 0.0f;
+		float Duration = 0.0f;
+	};
+
+	/** Moves the props in flight one step. Runs at the start of every tick. */
+	void UpdateFlights(float DeltaTime);
+	/** The ease of a flight, 0..1 in and out. */
+	float EaseFlightAlpha(float Alpha) const;
+	/** The component ticks while a placement or a charge is in progress, or while a prop is in flight. */
+	void RefreshTickEnabled();
+	/** The landing of a placed prop: collision and physics back, the final transform, OnPropPlaced and OnPropAction(Place). */
+	void FinishPlaceFlight(const FPlaceFlight& Flight);
+	/** Lands every prop in flight at once (end of play). */
+	void FinishAllPlaceFlights();
+
+	FGrabFlight GrabFlight;
+	TArray<FPlaceFlight> PlaceFlights;
 
 	// ---- State ----
 	void SetState(EPropInventoryState NewState);
@@ -472,8 +549,14 @@ private:
 	void CommitGrab(TWeakObjectPtr<AActor> WeakProp, int32 SlotIndex);
 
 	// ---- Commit timing ----
-	/** Asks the hook for the timing, then runs Commit now or later. Any earlier pending effect has been flushed before. */
-	void BeginCommit(EPropAction Action, EPropHand Hand, AActor* Prop, TFunction<void()> Commit);
+	/**
+	 * Asks the hook for the timing, then runs Commit now or later. Any earlier pending effect has been flushed before.
+	 * MinWaitSeconds is a floor set by the prop (the time its Close animation needs): the effect never happens sooner, whatever the hook said.
+	 */
+	void BeginCommit(EPropAction Action, EPropHand Hand, AActor* Prop, TFunction<void()> Commit, float MinWaitSeconds = 0.0f);
+
+	/** Applies the pending physical effect NOW, without waiting for MinWaitSeconds. The timer, a new action, cancel and end of play use it. */
+	void FlushPendingAction();
 
 	/** An accepted action whose physical effect has not happened yet. */
 	struct FPendingCommit
@@ -481,6 +564,8 @@ private:
 		TFunction<void()> Commit;
 		FTimerHandle Timer;
 		bool bActive = false;
+		/** World time before which a notify cannot release the effect (the prop is still preparing). 0 = no floor. */
+		double EarliestTime = 0.0;
 	};
 
 	// ---- Temporary Pawn-ignore after release ----

@@ -11,7 +11,7 @@
 // HOW AN NPC ANIMATION BLUEPRINT USES IT
 //   Create the Animation Blueprint for the NPC skeleton with this class as parent. In the AnimGraph: a top state
 //   machine with "Locomotion" (the framework variables, like ABP_SunsetCoveCharacter) and "Activity" states entered
-//   with HasActivity(NPC.Activity.Rest.Sit), HasActivity(NPC.Activity.Rest.Lay)... in the transition rules. The game
+//   with HasActivity(NPC.Activity.Rest.Lay)... in the transition rules. The game
 //   code never changes when the models arrive: set Mesh and Anim Class in BP_Visitor.
 //
 // HIERARCHY
