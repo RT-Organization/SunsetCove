@@ -232,6 +232,24 @@ void UToolInventoryComponent::AddRadialInput(const FVector2D& LookInput)
 	UpdateHoverFromVector();
 }
 
+void UToolInventoryComponent::SetRadialStickDirection(const FVector2D& Stick)
+{
+	if (State != EToolInventoryState::SelectingTool || Stick.Size() < static_cast<double>(RadialStickThreshold))
+	{
+		return;
+	}
+
+	// Full length in the stick's direction: the sector under it is selected at once. The stick and the look input share
+	// the same vertical sign, so the same Invert Radial Y applies (it is on in BP_Character for the mouse).
+	FVector2D Direction = Stick;
+	if (bInvertRadialY)
+	{
+		Direction.Y = -Direction.Y;
+	}
+	RadialVector = Direction.GetSafeNormal();
+	UpdateHoverFromVector();
+}
+
 // ----------------------------------------------------------------------
 // Input callbacks
 // ----------------------------------------------------------------------

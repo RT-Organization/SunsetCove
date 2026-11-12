@@ -25,10 +25,15 @@
 //
 // MAP TRAVEL
 //   A new GameMode exists on every map. Whatever must survive a map change lives in USunsetCoveGameInstance.
+//
+// AUDIO
+//   MapAudio (Class Defaults > Audio) names the gameplay music and ambient cues; BeginPlay starts them through the
+//   CoreFramework audio subsystem (the menu music crossfades into them). See Docs/AudioSystem/AudioSystem_Architecture.md.
 
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AudioSystem/SunsetCoveMapAudio.h"
 #include "GameFramework/GameModeBase.h"
 #include "SunsetCoveGameplayGameMode.generated.h"
 
@@ -45,6 +50,14 @@ public:
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 	//~ End AGameModeBase Interface
+
+	//~ Begin AActor Interface
+	virtual void BeginPlay() override;
+	//~ End AActor Interface
+
+	/** Music and ambient bed of every gameplay map that uses this GameMode (cues of DA_AudioConfig). Empty = silence. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio")
+	FSunsetCoveMapAudio MapAudio;
 
 	// SUNSETCOVE GAME LOGIC: add the match rules of SunsetCove below (spawn rules, win and lose conditions, round flow).
 	// Keep them here and never in CoreFramework: rules differ from game to game.

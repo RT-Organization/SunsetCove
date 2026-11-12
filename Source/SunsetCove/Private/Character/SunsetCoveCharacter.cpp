@@ -4,6 +4,8 @@
 #include "Character/SunsetCoveCharacter.h"
 
 #include "AnimationSystem/ArmsAnimation/ArmsAnimationComponent.h"
+#include "Core/Settings/SunsetCovePlayerPreferences.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Components/InputComponent.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
@@ -118,6 +120,26 @@ void ASunsetCoveCharacter::Tick(float DeltaSeconds)
 
 	// SUNSETCOVE GAME LOGIC: per-frame work that cannot be event driven (for example an interaction trace).
 	// Run it only where it is needed: IsLocallyControlled() for client-side traces, HasAuthority() for server rules.
+
+	// Toggle sprint ends when the player lets go of the movement input (or switched the setting back to Hold).
+	// A press while standing still waits for the first step instead of cancelling at once.
+	if (bSprintToggledOn)
+	{
+		const UCharacterMovementComponent* Movement = GetCharacterMovement();
+		const bool bMoving = Movement && !Movement->GetCurrentAcceleration().IsNearlyZero();
+		bToggledSprintHasMoved |= bMoving;
+		if ((bToggledSprintHasMoved && !bMoving) || USunsetCovePlayerPreferences::GetSprintMode() != ESunsetCoveSprintMode::Toggle)
+		{
+			StopToggledSprint();
+		}
+	}
+}
+
+void ASunsetCoveCharacter::StopToggledSprint()
+{
+	bSprintToggledOn = false;
+	bToggledSprintHasMoved = false;
+	Super::Input_SprintEnded(FInputActionValue());
 }
 
 void ASunsetCoveCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -269,6 +291,13 @@ void ASunsetCoveCharacter::OnToolActionRefused(EToolRefusal Reason, ASunsetCoveT
 		return;
 	}
 
+	// While a prop is being placed, LB / RB rotate it and RB is also the tool wheel key: the wheel is refused (hands busy)
+	// on every rotation step, which is expected, so no message then.
+	if (Reason == EToolRefusal::HandsBusy && PropInventory && PropInventory->GetState() == EPropInventoryState::Placing)
+	{
+		return;
+	}
+
 	const FName* NotificationId = ToolRefusalNotifications.Find(Reason);
 	USunsetCoveHUDSubsystem* HUD = USunsetCoveHUDSubsystem::Get(this);
 	if (NotificationId && HUD)
@@ -307,7 +336,20 @@ void ASunsetCoveCharacter::Input_Look(const FInputActionValue& Value)
 	// While the tool radial menu is open the look input picks a sector of the wheel instead of turning the camera.
 	if (ToolInventory && ToolInventory->IsRadialMenuOpen())
 	{
-		ToolInventory->AddRadialInput(Value.Get<FVector2D>());
+		// Controller: the wheel follows the raw right stick direction (the look value is scaled per frame and per axis,
+		// which makes a cursor slow and skews diagonals). Mouse: the look delta moves a cursor on the wheel.
+		const APlayerController* PlayerController = Cast<APlayerController>(GetController());
+		const FVector2D Stick = PlayerController
+			? FVector2D(PlayerController->GetInputAnalogKeyState(EKeys::Gamepad_RightX), PlayerController->GetInputAnalogKeyState(EKeys::Gamepad_RightY))
+			: FVector2D::ZeroVector;
+		if (!Stick.IsNearlyZero(0.05))
+		{
+			ToolInventory->SetRadialStickDirection(Stick);
+		}
+		else
+		{
+			ToolInventory->AddRadialInput(Value.Get<FVector2D>());
+		}
 		return;
 	}
 
@@ -360,12 +402,30 @@ void ASunsetCoveCharacter::Input_CrouchEnded(const FInputActionValue& Value)
 void ASunsetCoveCharacter::Input_SprintStarted(const FInputActionValue& Value)
 {
 	// SUNSETCOVE GAME LOGIC (before Super): veto sprinting (exhausted, carrying something heavy, aiming).
+
+	// Toggle mode: each press flips sprinting on / off; the release is ignored (see Input_SprintEnded).
+	if (USunsetCovePlayerPreferences::GetSprintMode() == ESunsetCoveSprintMode::Toggle)
+	{
+		if (bSprintToggledOn)
+		{
+			StopToggledSprint();
+			return;
+		}
+		bSprintToggledOn = true;
+	}
+
 	Super::Input_SprintStarted(Value);
 	// SUNSETCOVE GAME LOGIC (after Super): react to the sprint press (start a resource drain, change the weapon pose).
 }
 
 void ASunsetCoveCharacter::Input_SprintEnded(const FInputActionValue& Value)
 {
+	// Toggle mode: releasing the key does not stop a toggled sprint (the next press or stopping does).
+	if (bSprintToggledOn)
+	{
+		return;
+	}
+
 	// Always call Super for a release (see the note in the header).
 	Super::Input_SprintEnded(Value);
 	// SUNSETCOVE GAME LOGIC (after Super): react to the sprint release (stop the resource drain).

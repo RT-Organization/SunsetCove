@@ -109,11 +109,11 @@ Open the `IMC_SunsetCove` you made for the props and add **one** mapping:
 |---|---|---|---|
 | `IA_ToolMenu` | `Tab` | Gamepad Right Shoulder (R1 / RB) | none |
 
-`IA_PropPlace` (left mouse, R2 / RT) and `IA_PropDrop` (Q, Y / Triangle) are already mapped: **nothing to add** for using and dropping tools.
+`IA_PropPlace` (left mouse, R2 / RT) and `IA_PropDrop` (Q, B / Circle) are already mapped: **nothing to add** for using and dropping tools.
 
 ### Key conflicts with the framework
 
-As for props: the framework context (`IMC_Character`) is read only and ours has priority 1, so our mappings win. Check that `Tab` is not used there (if it is, change *our* key here, never the plugin asset). The Tab of the Unreal editor itself does not matter in game.
+As for props: the movement context (`IMC_Movement`, the project copy of the framework's `IMC_Character`) has priority 0 and ours has priority 1, so our mappings win. Check that `Tab` is not used there (if it is, change *our* key here, never the plugin asset). The Tab of the Unreal editor itself does not matter in game.
 
 ---
 
@@ -200,7 +200,8 @@ Select **Tool Inventory** on `BP_Character`.
 | | `Starting Tools` | the 4 placeholder tools | tools the player has at start (spawned and picked up on the first frame, first entry = slot 0). Empty it when tools come from the visitors' spots |\|Radial` | `Radial Radius` | 60 | the wheel is too sensitive (raise) or too sluggish (lower). It is how much mouse movement pushes the cursor to the edge |
 | | `Radial Dead Zone` | 0.35 | accidental selections near the center (raise) or you have to move too far (lower) |
 | | `Radial Start Angle Degrees` | 0 | rotate the layout. 0 = slot 0 at the top, the rest clockwise |
-| | `Invert Radial Y` | off | moving the mouse **up** selects the **bottom** sector: turn it on |
+| | `Invert Radial Y` | off | moving the mouse **up** selects the **bottom** sector: turn it on (mouse only) |
+| | `Radial Stick Threshold` | 0.25 | controller: how far the right stick must be pushed to pick the sector it points at (lower = more sensitive). The stick selects by direction at once; releasing it keeps the sector |
 | `ToolInventory|Slots` | `Max Tools` | 4 | the GDD limit changes (1-12). The wheel has one sector per slot and the HUD draws one slice per slot |
 | | `Starting Tools` | the 4 placeholder tools | tools the player has at start (spawned and picked up on the first frame, first entry = slot 0). Empty it when tools come from the visitors' spots |\|Drop` | `Drop Forward Speed` / `Drop Up Speed` | 250 / 100 cm/s | the tool flies too far / too little |
 | | `Inherit Owner Velocity Scale` | 1 | 0 = ignore the player's speed |
@@ -238,7 +239,8 @@ Put in the level: two different tools (for example `BP_Bucket` with `Tool Id = B
 | The tool floats in front of the arms, not in the hand | neither `Tool_R` nor `Prop_R` exists on the arms (a warning says so): it is at the fallback offset |
 | The tool sits wrong in the hand | the `Grip_R` bone and the hand socket do not share the same axes, or the grip is animated. Quick fix: **Hold Location / Rotation Offset** on the tool |
 | Moving the mouse up selects the bottom sector | turn on **Invert Radial Y** |
-| The wheel selects with the slightest movement / never | tune **Radial Radius** and **Radial Dead Zone** |
+| The wheel selects with the slightest movement / never | mouse: tune **Radial Radius** and **Radial Dead Zone**; controller: **Radial Stick Threshold** |
+| On controller, up on the stick selects the bottom sector, or the camera look is inverted | the right-stick look mapping in `IMC_Movement` must have **no** Negate modifier (only the mouse mapping has one) |
 | The wheel selects an empty sector | an empty sector selects nothing; release on it = hands free |
 | The camera keeps turning with the menu open | the character is not a `SunsetCoveCharacter` (the override lives there) |
 | Two tools of the same kind cannot be carried | **Allow Duplicate Tools** is off, or they have the same **Tool Id**. Give each tool a unique id; leave it empty for no duplicate check |

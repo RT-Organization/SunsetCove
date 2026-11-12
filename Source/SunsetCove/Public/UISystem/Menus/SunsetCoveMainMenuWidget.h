@@ -52,6 +52,8 @@ protected:
 	virtual void NativeOnActivated() override;
 	virtual void NativeOnDeactivated() override;
 	virtual UWidget* ResolveDefaultFocusWidget() const override;
+	/** CommonUI's own focus request (activation, back from Settings, device switch): the same button. */
+	virtual UWidget* NativeGetDesiredFocusTarget() const override;
 	//~ End UUserWidget / UCommonActivatableWidget
 
 	// ------------------------------------------------------------------

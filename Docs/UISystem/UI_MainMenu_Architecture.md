@@ -157,7 +157,7 @@ Default focus: Continue Game if visible, else New Game; it moves to Continue whe
 | The mouse really moves again over a button (or leaves and re-enters) | the mouse takes over again |
 | Disabled button | never takes focus from the mouse |
 
-Slate sends a synthetic mouse-move (cursor unmoved, zero delta) after every layout or focus change; the button ignores those, otherwise it would take the focus back from the keyboard on every key press. `Focus On Hover` (Class Defaults > *Menu Button*) turns the hover focus off for one button. Tab buttons (`WBP_Button_Tab`) are plain `UBaseButton` and keep the old behavior. If this is wanted for all buttons later, the logic belongs in `UBaseButton` (framework patch).
+Slate sends a synthetic mouse-move (cursor unmoved, zero delta) after every layout or focus change; the button ignores those, otherwise it would take the focus back from the keyboard on every key press. `Focus On Hover` (Class Defaults > *Menu Button*) turns the hover focus off for one button. The settings tab buttons (`WBP_Button_SettingTab`) are plain `UBaseButton` and keep the old behavior (the settings rows get the same rule from `USunsetCoveSettingsMenuWidget`). The Pause Menu uses `WBP_Button_Menu` too, laid out like the main menu (bottom-left column). If this is wanted for all buttons later, the logic belongs in `UBaseButton` (framework patch).
 
 ---
 

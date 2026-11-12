@@ -18,10 +18,15 @@
 //
 // SELECTING IT
 //   The main-menu map: Window > World Settings > Game Mode > GameMode Override = BP_GameMode_MainMenu.
+//
+// AUDIO
+//   MapAudio (Class Defaults > Audio) names the menu music and ambient cues; BeginPlay starts them through the
+//   CoreFramework audio subsystem. See Docs/AudioSystem/AudioSystem_Architecture.md.
 
 #pragma once
 
 #include "CoreMinimal.h"
+#include "AudioSystem/SunsetCoveMapAudio.h"
 #include "GameFramework/GameModeBase.h"
 #include "SunsetCoveMainMenuGameMode.generated.h"
 
@@ -32,6 +37,14 @@ class SUNSETCOVE_API ASunsetCoveMainMenuGameMode : public AGameModeBase
 
 public:
 	ASunsetCoveMainMenuGameMode();
+
+	//~ Begin AActor Interface
+	virtual void BeginPlay() override;
+	//~ End AActor Interface
+
+	/** Music and ambient bed of the menu (cues of DA_AudioConfig). Empty = silence. */
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Audio")
+	FSunsetCoveMapAudio MapAudio;
 
 	// SUNSETCOVE GAME LOGIC: the menu map normally needs no server logic. Add a hook here only if it does
 	// (for example a lobby step before the gameplay map).

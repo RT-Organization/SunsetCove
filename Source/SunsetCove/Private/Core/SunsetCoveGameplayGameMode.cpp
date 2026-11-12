@@ -32,6 +32,14 @@ void ASunsetCoveGameplayGameMode::InitGame(const FString& MapName, const FString
 	// SUNSETCOVE GAME LOGIC: read game options from the travel URL here (for example UGameplayStatics::ParseOption).
 }
 
+void ASunsetCoveGameplayGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Gameplay music / ambience. The menu music crossfades into it; the same track on the next map keeps playing.
+	MapAudio.Apply(this);
+}
+
 void ASunsetCoveGameplayGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);

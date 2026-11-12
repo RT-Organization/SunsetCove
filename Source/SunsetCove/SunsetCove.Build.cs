@@ -32,6 +32,9 @@ public class SunsetCove : ModuleRules
 		// and the Project Settings page (UDeveloperSettings).
 		PrivateDependencyModuleNames.AddRange(new string[] { "Slate", "SlateCore", "CommonUI", "DeveloperSettings" });
 
+		// Settings menu: the controller icon family (Xbox / PlayStation) is set on CommonUI's input subsystem.
+		PrivateDependencyModuleNames.AddRange(new string[] { "CommonInput" });
+
 		// Expose custom subfolders so headers can be found cleanly
 		PublicIncludePaths.AddRange(new string[] 
 		{

@@ -188,9 +188,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Radial", meta = (Units = "deg"))
 	float RadialStartAngleDegrees = 0.0f;
 
-	/** Flips the vertical look axis. Turn it on if moving the mouse up selects the bottom sector. */
+	/** Flips the vertical axis of the wheel, for the mouse AND the controller stick (they share the same sign). Turn it on if moving the mouse up selects the bottom sector. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Radial")
 	bool bInvertRadialY = false;
+
+	/**
+	 * Controller only: how far the right stick must be pushed (0..1) to pick the sector it points at. The stick selects by
+	 * DIRECTION, at once (no cursor to push like the mouse), and the sector stays selected when the stick is released.
+	 * Smaller = more sensitive. The mouse keeps using RadialRadius.
+	 */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Radial", meta = (ClampMin = "0.05", ClampMax = "0.95"))
+	float RadialStickThreshold = 0.25f;
 
 	// ------------------------------------------------------------------
 	// Configuration: drop
@@ -250,6 +258,12 @@ public:
 	 * menu is open. The character calls it from Input_Look and does not move the camera while the menu is open.
 	 */
 	void AddRadialInput(const FVector2D& LookInput);
+
+	/**
+	 * Controller: the raw right stick (-1..1, up = +Y) while the menu is open. Past RadialStickThreshold the selection jumps
+	 * to the sector the stick points at; below it nothing changes, so releasing the stick keeps the last sector.
+	 */
+	void SetRadialStickDirection(const FVector2D& Stick);
 
 	// ------------------------------------------------------------------
 	// Commands (also usable from Blueprint, for example by a future UI or a test)

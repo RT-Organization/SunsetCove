@@ -132,7 +132,7 @@ On every open and on `OnSlotsChanged`:
 
 - **Slices** = `BP_Character` > Components > Tool Inventory > `ToolInventory | Slots` > **Max Tools** (1–12). 4 → four 90° slices, 10 → ten 36° slices. Nothing else to change.
 - **Which tools exist**: create tool Blueprints (setup guide chapter 3). **Starting tools** (testing, or the GDD "initial tools"): **Starting Tools** list on the same component; the first entry lands in slot 0 (top). Today it holds the four placeholder tools — **empty the list** once tools come from the visitors' spots.
-- Rotate the layout: `ToolInventory | Radial` > **Radial Start Angle Degrees** (0 = slot 0 at the top, clockwise). Sensitivity: **Radial Radius**, **Radial Dead Zone**.
+- Rotate the layout: `ToolInventory | Radial` > **Radial Start Angle Degrees** (0 = slot 0 at the top, clockwise). Sensitivity: **Radial Radius**, **Radial Dead Zone** (mouse), **Radial Stick Threshold** (controller).
 
 ### 3.4 Restyle the wheel (`WBP_ToolRadialMenu` > Class Defaults)
 

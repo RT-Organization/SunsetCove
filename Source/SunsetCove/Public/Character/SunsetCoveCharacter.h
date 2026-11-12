@@ -197,4 +197,17 @@ protected:
 
 	/** Pushes domain and locomotion state into the state machine. Runs on the server and the owning client. */
 	virtual void UpdateStateMachine() override;
+
+private:
+	/**
+	 * Sprint Mode (Settings > Controls, USunsetCovePlayerPreferences): Hold = the framework behavior (run while held).
+	 * Toggle = a press starts running, the next press stops it; it also stops by itself when the player stops moving.
+	 */
+	bool bSprintToggledOn = false;
+
+	/** The player moved since the toggled sprint started (so "stopped moving" can end it). */
+	bool bToggledSprintHasMoved = false;
+
+	/** Toggle mode: ends a toggled sprint (player stopped moving, or the setting went back to Hold). */
+	void StopToggledSprint();
 };

@@ -229,7 +229,9 @@ Tool Menu pressed  -> OpenToolMenu: refused if hands busy (HandsBusy) or no tool
                       Stops a use in progress, resets the wheel, state = SelectingTool.
 look input (every frame the player moves the mouse / stick)
    ASunsetCoveCharacter::Input_Look -> ToolInventory->AddRadialInput(LookValue); camera does NOT move
-   RadialVector += LookValue / RadialRadius, clamped to length 1      (a cursor on the wheel)
+   mouse:      RadialVector += LookValue / RadialRadius, clamped to length 1      (a cursor on the wheel)
+   controller: RadialVector = normalized raw right stick, once it is past RadialStickThreshold (the character reads
+               Gamepad_RightX / RightY from the PlayerController; below the threshold the last sector stays)
    inside RadialDeadZone  -> nothing selected
    outside                -> angle = atan2(X, Y) clockwise from up; sector = floor((angle - Start + width/2) / width)
                              sector with a tool -> hovered (OnRadialHoverChanged), empty sector -> nothing

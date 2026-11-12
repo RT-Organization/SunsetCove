@@ -21,6 +21,14 @@ USunsetCoveMainMenuWidget::USunsetCoveMainMenuWidget(const FObjectInitializer& O
 	NewGameConfirmRequest.ConfirmLabel = LOCTEXT("NewGameConfirm", "Confirm");
 	NewGameConfirmRequest.CancelLabel = LOCTEXT("NewGameCancel", "Cancel");
 	NewGameConfirmRequest.bFocusConfirmButton = false;
+
+	// Back from Settings / the popup: the button that opened it gets the focus again.
+	bAutoRestoreFocus = true;
+}
+
+UWidget* USunsetCoveMainMenuWidget::NativeGetDesiredFocusTarget() const
+{
+	return ResolveDefaultFocusWidget();
 }
 
 USunsetCoveGameFlowSubsystem* USunsetCoveMainMenuWidget::GetGameFlow() const

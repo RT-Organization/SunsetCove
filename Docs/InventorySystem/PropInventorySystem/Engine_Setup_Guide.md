@@ -110,7 +110,7 @@ Create them in `Content/InventorySystem/PropInventorySystem/Input/` (and the int
 | `IA_Interact` | Digital (bool) | none | grab and every future interaction |
 | `IA_PropPlace` | Digital (bool) | **none** | hold = hologram, release = place |
 | `IA_PropThrow` | Digital (bool) | **none** | hold = charge, release = throw |
-| `IA_PropRotate` | **Axis1D (float)** | none | mouse wheel |
+| `IA_PropRotate` | **Axis1D (float)** | none | mouse wheel up / down, LB / RB |
 | `IA_PropDrop` | Digital (bool) | none | |
 
 **Do not add triggers** (Hold, Pressed, Tap...) to `IA_PropPlace` and `IA_PropThrow`: the system needs *Started* on press and *Completed* on release. Leave the other settings at their defaults.
@@ -128,20 +128,26 @@ The framework already has a context (`IMC_Character`). **Do not edit it** (it is
 
 | Action | Keyboard & mouse | Controller (GDD proposal) | Modifiers / triggers on the mapping |
 |---|---|---|---|
-| `IA_Interact` | `E` | Gamepad Face Button Bottom (A / Cross) | none |
+| `IA_Interact` | `E` | Gamepad Face Button Left (X / Square) | none |
 | `IA_PropPlace` | Left Mouse Button | Gamepad Right Trigger (R2 / RT) | none |
 | `IA_PropThrow` | Right Mouse Button | Gamepad Left Trigger (L2 / LT) | none |
-| `IA_PropRotate` | **Mouse Wheel Axis** | Gamepad D-pad Right (+1) and D-pad Left (**Negate** modifier) | wheel: none. D-pad: add trigger **Pressed**, so one press = one step |
-| `IA_PropDrop` | `Q` | Gamepad Face Button Top (Y / Triangle) | none |
+| `IA_PropRotate` | **Mouse Scroll Up** (+1) and **Mouse Scroll Down** (**Negate**) | Gamepad Right Shoulder RB / R1 (+1) and Left Shoulder LB / L1 (**Negate**) | shoulders: trigger **Pressed**, so one press = one step |
+| `IA_PropDrop` | `Q` | Gamepad Face Button Right (B / Circle) | none |
 
-3. If the wheel turns the hologram the wrong way, add a **Negate** modifier to the Mouse Wheel mapping.
+(Jump is on A / Cross, in `IMC_Movement`.)
+
+**RB is shared** by Rotate Right and the tool wheel (`IA_ToolMenu`). No conflict: the wheel never opens with a prop in hand (hands busy), and while a prop is being placed the character does not show the "hands busy" message (`ASunsetCoveCharacter::OnToolActionRefused`).
+
+3. Rotation is split per direction so the player can remap it (Settings > Controls > Input Mapping, rows **Rotate Right** / **Rotate Left**): each of the four rotate mappings has *Setting Behavior* = Override Settings, named `RotateRight` (scroll up, RB) or `RotateLeft` (scroll down, LB), category Actions. If the hologram turns the wrong way, swap the Negate modifier between the two scroll mappings.
 4. Gamepad triggers are analog: they fire *Started* when pressed past the actuation threshold (default 0.5) and *Completed* when released, which is what is needed.
 
 ### Key conflicts with the framework
 
 The framework context uses some keys already (Shift, Ctrl, Space were confirmed; the Dash / Dodge keys could not be read from the asset). Because our context has priority 1, **our mappings win** a conflict. To check: open `IMC_Character` (read only) and look for `Q`, `E`, left / right mouse. If Dash or Dodge is on `Q`, `Q` will now drop props instead. Fix by re-mapping *our* key (change `IA_PropDrop`'s key here), never by editing the plugin asset.
 
-The pause key is owned by the PlayerController's own context (`Esc`). No conflict.
+The pause key is owned by the PlayerController's own context, `Content/Input/Context/IMC_Player` (`IA_Pause` on `Esc`, gamepad Start, and **`Insert`, a temporary key for testing in the editor** where `Esc` ends Play In Editor; remove that mapping before shipping). No conflict.
+
+`SunsetCove` does not use the framework's `IMC_Character` any more: `BP_Character` uses `DA_InputConfig_SunsetCove`, whose default context is the project copy `IMC_Movement` (remappable movement, gamepad move / look, no Fly / Dash / Dodge on E / Q). See `Docs/UISystem/UI_Settings_Architecture.md` § 9.
 
 ---
 

@@ -10,3 +10,11 @@ ASunsetCoveMainMenuGameMode::ASunsetCoveMainMenuGameMode()
 
 	// The HUD Class (BP_Startup_MainMenu) is chosen in BP_GameMode_MainMenu: it is a Blueprint that lists the screens.
 }
+
+void ASunsetCoveMainMenuGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Menu music / ambience (crossfades from whatever the previous map played).
+	MapAudio.Apply(this);
+}

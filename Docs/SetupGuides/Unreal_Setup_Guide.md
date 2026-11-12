@@ -20,6 +20,8 @@
 | 7 | [Template for new chapters](#7-template-for-new-chapters) | adding a new kind of thing to this guide |
 | 8 | [HUD: elements, messages and tool icons](#8-hud-elements-messages-and-tool-icons) | a new HUD message, tool icon, HUD element, or a restyle |
 | 9 | [Menus: buttons, popups, fonts and the main menu](#9-menus-buttons-popups-fonts-and-the-main-menu) | a new menu button, a yes / no question, a new font, the menu background |
+| 10 | [Audio: a new sound, music or volume category](#10-audio-a-new-sound-music-or-volume-category) | a new sound effect, the music of a map, a new slider in Options > Audio |
+| 11 | [Settings and input: options, remappable actions, button prompts](#11-settings-and-input-options-remappable-actions-button-prompts) | a new line in Options, a new action in Input Mapping, a key prompt in the world or the HUD, a new controller family |
 
 > **How this guide was written.** It was derived by reading the C++ in `Source/SunsetCove/` and the existing system docs, and by looking at the folder structure of `Content/` (not the contents of the assets). Nothing here was run in the editor. Steps that depend on what is inside an asset (for example the exact bones of your Blender rig) are marked **(check)**.
 
@@ -418,7 +420,7 @@ Only for these cases. A plain new prop or tool needs **no** tag.
 | a new **thing visitors do** on a spot (for example `Read`) | yes | `NPC.Activity.Rest.<Name>` |
 | a new UI screen / HUD slot | yes (not covered here) | `UI.Screen.*`, `UI.HUDSlot.*` |
 
-Tags today (`Config/DefaultGameplayTags.ini`): `Cove.Spot.Sunbed`, `NPC.Activity.Rest.Lay`, `NPC.Activity.Rest.Sit`, `UI.HUDSlot.BottomLeft`, `UI.Screen.ConfirmPopup`, `.HUD`, `.MainMenu`, `.PauseMenu`, `.Settings`. (`Cove.Spot.Sand`, `Cove.Spot.Umbrella` and `NPC.Activity.Rest.Stand` were removed on purpose.)
+Tags today (`Config/DefaultGameplayTags.ini`): `Cove.Spot.Sunbed`, `NPC.Activity.Rest.Lay`, `NPC.Activity.Rest.Sit`, `UI.HUDSlot.BottomLeft`, `UI.Screen.ConfirmPopup`, `.HUD`, `.KeyBindings`, `.MainMenu`, `.PauseMenu`, `.Settings`, `Audio.Cue.UI.Hover`, `.UI.Click`, `.UI.PopupOpen`, `.UI.PopupClose`, `.Music.MainMenu`, `.Music.Gameplay`, `.Ambient.Beach` (sound ids, chapter 10). (`Cove.Spot.Sand`, `Cove.Spot.Umbrella` and `NPC.Activity.Rest.Stand` were removed on purpose.)
 
 ### 4.2 How (in the editor)
 
@@ -592,3 +594,90 @@ Use the existing popup, never a new widget: `UBaseConfirmPopupWidget::OpenConfir
 | 2 | Project Settings > Game > **Sunset Cove Game Flow** | only to change the world slot name or the maps New Game / Continue open | |
 | 3 | `L_MainMenu` | only to change the menu background | move `MenuCamera`, edit `PP_MenuSunset`, swap the cove level instance |
 | 4 | `Plugins/CoreFramework` | **Never** | |
+
+---
+
+## 10. Audio: a new sound, music or volume category
+
+How it works inside: [`Docs/AudioSystem/AudioSystem_Architecture.md`](../AudioSystem/AudioSystem_Architecture.md). Full editor reference and test list: [`Docs/AudioSystem/AudioSystem_Setup.md`](../AudioSystem/AudioSystem_Setup.md). The list of every sound to find, with file names, folders and cue tags: [`Docs/AudioSystem/AudioSystem_SoundList.md`](../AudioSystem/AudioSystem_SoundList.md). Rule: game code and data name a **cue tag** (`Audio.Cue.<Area>.<Name>`), never a sound asset.
+
+### 10.1 A new sound effect
+
+1. Import into `Content/Audio/<SFX | Ambient | Music | UI>/` as `S_<Area>_<Name>`; on the asset set **Sound Class** (`SC_SFX`, ...) and **Looping** if it loops.
+2. Gameplay tag `Audio.Cue.<Area>.<Name>` (chapter 4.2).
+3. `Content/Audio/DA_AudioConfig` > **Cues** > + : Cue Tag, Sound, Category; Preload on for short frequent sounds; small Volume/Pitch Random Range for repeated sounds.
+4. Trigger it: *Play Audio Cue* anim notify (arms: Audience **Owner Only**), *Play Cue 2D / At Location / Attached* in Blueprint, or a cue field on a button / screen.
+
+### 10.2 Music or ambience of a map
+
+Fill the **Sound** of `Audio.Cue.Music.MainMenu`, `Audio.Cue.Music.Gameplay`, `Audio.Cue.Ambient.Beach` in `DA_AudioConfig` (looping assets). Which cue a map plays is `BP_GameMode_MainMenu` / `BP_GameMode_Gameplay` > Class Defaults > **Audio > Map Audio**; empty = silence.
+
+### 10.3 A new volume slider (new category)
+
+Tag `CoreFramework.Audio.Category.<Name>` → Sound Class child of `SC_Master` → row in `DA_AudioConfig > Categories` → drag a `WBP_VolumeRow` into `WBP_Tab_Audio` and set its Category and Label. No code.
+
+### 10.4 What else to touch (the checklist)
+
+| # | Where | Needed? | What to do |
+|---|---|---|---|
+| 1 | `DA_AudioConfig` | **always** | one Cues row per sound |
+| 2 | Project Settings > Gameplay Tags | for a new cue or category | `Audio.Cue.*` / `CoreFramework.Audio.Category.*` |
+| 3 | Project Settings > CoreFramework Audio | **No** | already points at `DA_AudioConfig` |
+| 4 | `WBP_Tab_Audio` | only for a new category | one `WBP_VolumeRow`; never add Apply / Revert / Has Pending Changes overrides there |
+| 5 | `BP_ButtonStyle_*` | **No** | keep their Slate sound slots empty |
+| 6 | `Plugins/CoreFramework` | **Never** | |
+
+---
+
+## 11. Settings and input: options, remappable actions, button prompts
+
+How it works inside: [`Docs/UISystem/UI_Settings_Architecture.md`](../UISystem/UI_Settings_Architecture.md). The row presets and prompts live in `Content/UI/Components/Settings/`, the pages in `Content/UI/Menus/Settings/Tabs/`.
+
+### 11.1 A new line in Options
+
+1. Open the page (`WBP_Tab_Graphics`, `_Controls`, `_Audio`) and drag the preset into `Scroll > List`: `WBP_SettingRow_Option` (`< value >`), `_Toggle` (On / Off), `_Slider` (value on the right), `_Header` (section title), or `WBP_Button_SettingLink` (a line that opens a screen).
+2. On the placed row: **Label** and **Description** (the description appears under the list while the row is highlighted). Slider: Min / Max / Step / Value Format.
+3. Rename the row:
+   - a **framework setting** uses the exact name the page expects (for example `ShadowsRow`; list in `Plugins/CoreFramework/Docs/UISystem/UI_Settings_Widgets.md`). Nothing else to do.
+   - a **new game setting** needs code: a `BindWidgetOptional` row in the page's C++ class, which reads, applies, reverts and reports pending changes (template: `ControllerIconsRow` in `USunsetCoveControlsTabWidget`).
+4. Do **not** add *Has Pending Changes* / *Apply Changes* / *Revert Changes* overrides in a page Blueprint: they replace the C++ and Back stops saving.
+
+Restyle every row at once in the presets, the `BP_TextStyle_Setting*` text styles, or `Font_UI_Main`. Never restyle a single placed row.
+
+### 11.2 A new action in Input Mapping
+
+1. On the **Input Action**: *Player Mappable Key Settings* → **Name** (the save key, never change it after release), **Display Name** (row label), **Display Category** (section, for example "Actions").
+   For an action with several meanings (Move = forward / back / left / right), set it per mapping instead: in the mapping context, mapping > *Setting Behavior* = **Override Settings**, with its own Name. Give the keyboard mapping and the gamepad mapping the **same Name** so they share one row.
+2. The mapping context must be in **Project Settings > CoreFramework > CoreFramework Input > Remappable Contexts** (today `IMC_Movement`, `IMC_SunsetCove`).
+3. Done: the row appears in Settings > Controls > Input Mapping. A device without a mapping shows "–" in its column and cannot be bound.
+
+Movement actions come from `Content/Input/Context/IMC_Movement` (the project copy of the framework's character context, used by `BP_Character` through `DA_InputConfig_SunsetCove`). Edit that copy, never the plugin one.
+
+### 11.3 A key prompt (world, HUD, suggestion box)
+
+Drag **`WBP_InputPrompt`** where the hint goes and set **one** source:
+
+| Property | Shows |
+|---|---|
+| **Input Action** (for example `IA_Interact`) + **Label** "Pick up" | the player's current key for that action, remaps included: `(X) Pick up` with a controller, `E Pick up` on keyboard |
+| **UI Action** (a `DT_UI_Actions` row) | Back, Confirm, NextTab, PreviousTab |
+| **Keyboard Key** / **Gamepad Key** | a fixed key |
+
+**Keyboard Display**: Project Default (key text), Glyph, or None. **Collapse When No Key** hides the prompt when the device has no key for it. It follows the device by itself: no graph. For a button with a prompt (like Back), use **`WBP_Button_Prompt`**.
+
+### 11.4 A new controller family (Switch, Steam Deck...)
+
+1. Glyph textures into `Content/UI/Input/Glyphs/<Family>/`.
+2. A Blueprint of class **Common Input Base Controller Data** in `Content/UI/Input/Data/` (copy `BP_InputData_Gamepad_Xbox`): Input Type Gamepad, a new **Gamepad Name**, one brush per key, and the hardware ids it should be detected from.
+3. `Config/Windows/WindowsGame.ini` > `[CommonInputPlatformSettings_Windows CommonInputPlatformSettings]` > one more `+ControllerData=` line.
+4. To let players force it: one more entry in `ESunsetCoveControllerIcons`, its name in Project Settings > Game > Sunset Cove UI > Controller Icons, and its label in `WBP_Tab_Controls` > Controller Icons Names (code change).
+
+### 11.5 What else to touch (the checklist)
+
+| # | Where | Needed? | What to do |
+|---|---|---|---|
+| 1 | `DA_UIConfig` > Screens | only for a **new screen** | tag + class + layer (settings sub-screens on `CoreFramework.UI.Layer.Menu`) |
+| 2 | `DA_Settings_Tabs` | only for a **new page** | tab id, name, page class, order |
+| 3 | `DefaultInput.ini` `bEnableUserSettings=True` | **No** | already on (Input Mapping needs it) |
+| 4 | Project Settings > User Interface > Render Focus Rule | **No** | stays **Never** (rows draw their own focus) |
+| 5 | `Plugins/CoreFramework` | **Never** | framework changes go to `FrameworkPatches/` and the FrameWorks repository |

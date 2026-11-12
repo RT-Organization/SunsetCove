@@ -32,4 +32,14 @@ public:
 	 */
 	UPROPERTY(Config, EditAnywhere, Category = "HUD|Notifications", meta = (RequiredAssetDataTags = "RowStructure=/Script/SunsetCove.HUDNotificationRow"))
 	TSoftObjectPtr<UDataTable> NotificationTable;
+
+	/**
+	 * Gamepad family names of the CommonUI controller data (Content/UI/Input/Data): Settings > Controls > Controller Icons
+	 * forces CommonUI to this family. Must match the Gamepad Name of BP_InputData_Gamepad_Xbox / _PlayStation.
+	 */
+	UPROPERTY(Config, EditAnywhere, Category = "Input|Controller Icons")
+	FName XboxGamepadName = TEXT("XSX");
+
+	UPROPERTY(Config, EditAnywhere, Category = "Input|Controller Icons")
+	FName PlayStationGamepadName = TEXT("PS5");
 };

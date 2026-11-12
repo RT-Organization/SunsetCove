@@ -45,13 +45,18 @@ Content/
 │
 ├── Core/                          GameInstance and GameModes (BP_GameInstance, BP_GameMode_*)   exists
 ├── Player/                        BP_PlayerController                                   exists
-├── Input/                         Actions/ (IA_*), Context/ (IMC_SunsetCove)            exists
+├── Input/                         Actions/ (IA_*), Context/ (IMC_SunsetCove, IMC_Movement, IMC_Player), Data/ (DA_InputConfig_SunsetCove)   exists
 ├── Environment/                   day/night and world systems                           exists
 │   └── DayNightCycle/             BP_DayNightManager, DA_DayNightLightingProfile_Default, Curves/   exists
 ├── Materials/                     shared materials and instances (MI_Sand, M_Hologram...)  exists (Test/)
 ├── UI/                            all widgets: Components/, HUD/, Menus/, Popups/, Config/, Startup/   exists
+│   ├── Components/Settings/       settings row presets, prompts (WBP_SettingRow_*, WBP_InputPrompt...)   exists
+│   ├── Components/Text/           every text style (BP_TextStyle_*)                     exists
+│   ├── Fonts/                     Font_UI_Main and the logo font                         exists
+│   ├── Input/Data/                controller data: glyphs per device (BP_InputData_*)   exists
+│   ├── Input/Glyphs/              button glyph textures: KeyboardMouse/, Xbox/, PlayStation5/, PlayStation4/, Switch/   exists
 │   └── Icons/                     textures for icons (tools, requests, satisfaction emoji)    new
-├── Audio/                         sounds and music (Ambient/, SFX/, Music/)             new
+├── Audio/                         DA_AudioConfig, Classes/ (SC_*), UI/Beach/, SFX/, Ambient/, Music/   exists (Docs/AudioSystem/AudioSystem_Setup.md)
 ├── VFX/                           Niagara systems and their materials                   new
 ├── Levels/                        _Main/ (shipping maps), Ro/, Ni/, Fra/ (personal test areas)   exists
 ├── Collections/, Developers/      editor-side, personal; never reference them from the game   exists
@@ -86,6 +91,8 @@ Source files that are **not** Content (Blender, FBX) stay in the repository fold
 | An **event** actor (police, bodyguard) | `Content/Gameplay/Events/<Name>/` | `BP_PoliceOfficer` |
 | A **widget** (HUD, menu, popup) | `Content/UI/...` (see its sub folders) | `WBP_HUD` |
 | An **Input Action** / **mapping context** | `Content/Input/Actions/`, `Content/Input/Context/` | `IA_PropPlace` |
+| A **button glyph** set / **controller data** | textures in `Content/UI/Input/Glyphs/<Family>/`, data in `Content/UI/Input/Data/` | `BP_InputData_Gamepad_Xbox` |
+| A **settings row** or **prompt** preset | `Content/UI/Components/Settings/` | `WBP_SettingRow_Slider` |
 | A **data asset** | next to the system that reads it | `DA_ArmsAnimations` (in `Animation/ArmsItems/`), `DA_UIConfig` (in `UI/Config/`) |
 | A **curve** | in the folder of its system | `Environment/DayNightCycle/Curves/` |
 | A **sound** | `Content/Audio/<SFX or Ambient or Music>/` | `S_Sunbed_Open` |
@@ -192,5 +199,5 @@ Follow what is already in the project. The Unreal convention is `<Prefix>_<Name>
 
 - Whether the `Gameplay/Blueprints/BP_Sunbed` moves to `Gameplay/Props/` (recommended; use the Content Browser **Move**, then Fix Up Redirectors).
 - Where visitor (NPC) meshes go once they exist: `Mesh/Characters/<Name>/` is proposed above, to be confirmed.
-- Audio and VFX folder structure is a proposal: the project has none yet.
+- VFX folder structure is a proposal: the project has none yet. (Audio exists since 2026-11-12: `Content/Audio/`, see `Docs/AudioSystem/AudioSystem_Setup.md`.)
 - Sub folders for textures and materials of an item (`Textures/`, `Materials/`) are optional while an item has only a few assets.
