@@ -51,7 +51,7 @@ public:
 	void Interact(AActor* Interactor);
 	virtual void Interact_Implementation(AActor* Interactor) {}
 
-	/** Short text for the future prompt widget ("Open the barrier", "Sleep"). Empty by default. */
+	/** Action text of the HUD interaction prompt ("Open the barrier", "Sleep"), shown with the key of the Interact action. Empty = no prompt. */
 	UFUNCTION(BlueprintNativeEvent, BlueprintCallable, Category = "SunsetCove|Interaction")
 	FText GetInteractionPrompt() const;
 	virtual FText GetInteractionPrompt_Implementation() const { return FText::GetEmpty(); }

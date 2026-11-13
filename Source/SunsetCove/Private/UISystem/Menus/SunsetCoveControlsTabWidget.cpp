@@ -18,6 +18,10 @@ USunsetCoveControlsTabWidget::USunsetCoveControlsTabWidget(const FObjectInitiali
 	SprintModeNames = {
 		LOCTEXT("SprintHold", "Hold"),
 		LOCTEXT("SprintToggle", "Toggle") };
+
+	HintsNames = {
+		LOCTEXT("HintsOn", "On"),
+		LOCTEXT("HintsOff", "Off") };
 }
 
 void USunsetCoveControlsTabWidget::NativeOnInitialized()
@@ -32,6 +36,10 @@ void USunsetCoveControlsTabWidget::NativeOnInitialized()
 	{
 		SprintModeRow->OnSelectionChanged.AddUniqueDynamic(this, &USunsetCoveControlsTabWidget::HandleSprintModeChanged);
 	}
+	if (HintsRow)
+	{
+		HintsRow->OnSelectionChanged.AddUniqueDynamic(this, &USunsetCoveControlsTabWidget::HandleHintsChanged);
+	}
 }
 
 void USunsetCoveControlsTabWidget::NativeConstruct()
@@ -43,8 +51,10 @@ void USunsetCoveControlsTabWidget::NativeConstruct()
 		IconsSnapshot = Icons->GetControllerIcons();
 	}
 	SprintSnapshot = USunsetCovePlayerPreferences::GetSprintMode();
+	bHintsSnapshot = USunsetCovePlayerPreferences::AreHintsEnabled();
 	RefreshControllerIconsRow();
 	RefreshSprintModeRow();
+	RefreshHintsRow();
 }
 
 void USunsetCoveControlsTabWidget::NotifyTabSelected()
@@ -52,6 +62,7 @@ void USunsetCoveControlsTabWidget::NotifyTabSelected()
 	Super::NotifyTabSelected();
 	RefreshControllerIconsRow();
 	RefreshSprintModeRow();
+	RefreshHintsRow();
 }
 
 void USunsetCoveControlsTabWidget::RefreshControllerIconsRow()
@@ -73,6 +84,14 @@ void USunsetCoveControlsTabWidget::RefreshSprintModeRow()
 	}
 }
 
+void USunsetCoveControlsTabWidget::RefreshHintsRow()
+{
+	if (HintsRow)
+	{
+		HintsRow->SetOptions(HintsNames, USunsetCovePlayerPreferences::AreHintsEnabled() ? 0 : 1);
+	}
+}
+
 void USunsetCoveControlsTabWidget::HandleControllerIconsChanged(UOptionSettingRowWidget* Row, int32 SelectedIndex)
 {
 	if (USunsetCoveControllerIconsSubsystem* Icons = USunsetCoveControllerIconsSubsystem::Get(this))
@@ -86,12 +105,19 @@ void USunsetCoveControlsTabWidget::HandleSprintModeChanged(UOptionSettingRowWidg
 	USunsetCovePlayerPreferences::SetSprintMode(SelectedIndex == 1 ? ESunsetCoveSprintMode::Toggle : ESunsetCoveSprintMode::Hold, /*bSave=*/false);
 }
 
+void USunsetCoveControlsTabWidget::HandleHintsChanged(UOptionSettingRowWidget* Row, int32 SelectedIndex)
+{
+	// Index 0 = On, 1 = Off. Applied at once (the HUD reads it every frame), saved by Back.
+	USunsetCovePlayerPreferences::SetHintsEnabled(SelectedIndex == 0, /*bSave=*/false);
+}
+
 bool USunsetCoveControlsTabWidget::HasPendingChanges_Implementation() const
 {
 	const USunsetCoveControllerIconsSubsystem* Icons = USunsetCoveControllerIconsSubsystem::Get(this);
 	const bool bIconsChanged = Icons && Icons->GetControllerIcons() != IconsSnapshot;
 	const bool bSprintChanged = USunsetCovePlayerPreferences::GetSprintMode() != SprintSnapshot;
-	return bIconsChanged || bSprintChanged || Super::HasPendingChanges_Implementation();
+	const bool bHintsChanged = USunsetCovePlayerPreferences::AreHintsEnabled() != bHintsSnapshot;
+	return bIconsChanged || bSprintChanged || bHintsChanged || Super::HasPendingChanges_Implementation();
 }
 
 void USunsetCoveControlsTabWidget::ApplyChanges_Implementation()
@@ -106,6 +132,9 @@ void USunsetCoveControlsTabWidget::ApplyChanges_Implementation()
 
 	SprintSnapshot = USunsetCovePlayerPreferences::GetSprintMode();
 	USunsetCovePlayerPreferences::SetSprintMode(SprintSnapshot, /*bSave=*/true);
+
+	bHintsSnapshot = USunsetCovePlayerPreferences::AreHintsEnabled();
+	USunsetCovePlayerPreferences::SetHintsEnabled(bHintsSnapshot, /*bSave=*/true);
 }
 
 void USunsetCoveControlsTabWidget::RevertChanges_Implementation()
@@ -117,8 +146,10 @@ void USunsetCoveControlsTabWidget::RevertChanges_Implementation()
 		Icons->SetControllerIcons(IconsSnapshot, /*bSave=*/false);
 	}
 	USunsetCovePlayerPreferences::SetSprintMode(SprintSnapshot, /*bSave=*/false);
+	USunsetCovePlayerPreferences::SetHintsEnabled(bHintsSnapshot, /*bSave=*/false);
 	RefreshControllerIconsRow();
 	RefreshSprintModeRow();
+	RefreshHintsRow();
 }
 
 #undef LOCTEXT_NAMESPACE

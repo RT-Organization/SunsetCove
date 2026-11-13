@@ -11,10 +11,14 @@
 //   Rest spots (USunsetCoveRestSpotComponent) are added to the Blueprint as children of PropMesh or CollisionBody.
 //
 // COMPONENTS
-//   CollisionBody (root)   An invisible box. It is the ROOT, so it carries the physics, the collision and the attachment
-//                          to the hand, as the Prop Inventory needs (Movable primitive with simple collision). The
-//                          interaction trace hits it, so it is what the player aims at.
+//   CollisionBody (root)   An invisible box (USunsetCovePivotBoxComponent, Core/Components/). It is the ROOT, so it carries the
+//                          physics, the collision and the attachment to the hand, as the Prop Inventory needs (Movable primitive
+//                          with simple collision). The interaction trace hits it, so it is what the player aims at.
 //                          Its size comes from the mesh (bAutoFitCollisionToMesh) so you never size it by hand.
+//                          ORIGIN AT THE BASE: the actor origin is the center of the BOTTOM of the box (Origin = Bottom), and the
+//                          mesh is moved so its base is on it. Dragged into a level, snapped to the floor (End), spawned at a
+//                          point or placed by the player, the prop stands ON the surface. Whatever pivot the FBX has, nothing to
+//                          fix in Blender or by hand. (CollisionBody > Origin = Center brings back a centered origin.)
 //   PropMesh               The skeletal mesh of the prop, a child of the box. It has NO collision: it only shows and
 //                          animates. Rigid physics on the box moves it like one solid object, the skeleton never
 //                          ragdolls.
@@ -32,7 +36,7 @@
 //   tune on top of it, in the space of the hand socket, for when something has to be nudged without going back to
 //   Blender. A prop can have a different grip for the left hand (LeftGripSocketName); if it is empty or missing, the
 //   same grip is used for both hands.
-//   Without a grip bone the root of the prop (the center of the box) is placed on the hand socket, and one warning says so.
+//   Without a grip bone the root of the prop (the center of the base of the box) is placed on the hand socket, and one warning says so.
 //
 // ANIMATION
 //   The system tells the prop what happens to it. Two ways to react, use either:
@@ -65,7 +69,7 @@
 #include "SunsetCoveProp.generated.h"
 
 class UAnimationAsset;
-class UBoxComponent;
+class USunsetCovePivotBoxComponent;
 class USkeletalMeshComponent;
 
 UCLASS(Blueprintable, ClassGroup = (SunsetCove))
@@ -87,7 +91,7 @@ public:
 
 	/** The root: invisible box that carries collision, physics and the attachment to the hand. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Prop|Components")
-	TObjectPtr<UBoxComponent> CollisionBody;
+	TObjectPtr<USunsetCovePivotBoxComponent> CollisionBody;
 
 	/** The skeletal mesh (visual only, no collision). Set its Skeletal Mesh Asset in the Blueprint. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Prop|Components")
@@ -132,11 +136,11 @@ public:
 	// Collision and physics
 	// ------------------------------------------------------------------
 
-	/** True: the box is sized from the bounds of the mesh and the mesh is centered in it. False: you size it with CollisionBoxExtent and place the mesh yourself. */
+	/** True: the box is sized from the bounds of the mesh and the mesh is placed in it (base on the origin, see CollisionBody > Origin). False: you size it with CollisionBoxExtent and place the mesh yourself. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Prop|Collision")
 	bool bAutoFitCollisionToMesh = true;
 
-	/** Extra size added on every side of the auto-fitted box (cm). A little extra makes the prop easier to aim at. */
+	/** Extra size added on the sides and the top of the auto-fitted box (cm), never under the base. A little extra makes the prop easier to aim at. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Prop|Collision", meta = (ClampMin = "0.0", Units = "cm", EditCondition = "bAutoFitCollisionToMesh"))
 	float CollisionPadding = 2.0f;
 

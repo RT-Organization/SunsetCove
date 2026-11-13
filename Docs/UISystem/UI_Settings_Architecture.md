@@ -107,7 +107,7 @@ Scroll            Scroll Box: thin scroll bar on the right (3 px, shown only whe
    └─ ViewDistanceRow … ShadingRow                 (ten quality groups)
 ```
 
-Controls: `KeyBindingsButton` (link "Input Mapping"), `ControllerIconsRow`, `MouseSensitivityRow`, `GamepadSensitivityRow` (Multiplier, 0.10x..3.00x), `SprintModeRow` (Hold / Toggle), `InvertXRow`, `InvertYRow`. (The framework also supports `AimAssistRow` and `VibrationRow`; SunsetCove has neither feature, so they are not placed.)
+Controls: `KeyBindingsButton` (link "Input Mapping"), `ControllerIconsRow`, `MouseSensitivityRow`, `GamepadSensitivityRow` (Multiplier, 0.10x..3.00x), `SprintModeRow` (Hold / Toggle), `InvertXRow`, `InvertYRow`, `HintsRow` (On / Off). (The framework also supports `AimAssistRow` and `VibrationRow`; SunsetCove has neither feature, so they are not placed.)
 Audio: five `WBP_VolumeRow` (Master, Music, Ambient, Effects, Interface), see `Docs/AudioSystem/AudioSystem_Architecture.md`.
 
 Every row has a **Label** and a **Description** typed on the placed row (Details panel). The page classes find their rows **by name**, so a row can be moved, restyled or removed (a missing row is simply skipped) without code.
@@ -317,6 +317,7 @@ Place a `WBP_InputPrompt` (or a widget with a `UInputPromptWidget` parent) and s
 | Mouse Sensitivity / Controller Sensitivity | multiplier on look input (`ABaseCharacter::Input_Look` through `ApplyLookPreferences`) | `[CoreFramework.Input]` |
 | Invert X / Invert Y | flips look axes | same |
 | Sprint | **Hold** (default): run while the sprint key is held. **Toggle**: a press starts running, the next press or stopping ends it (`ASunsetCoveCharacter` Input_SprintStarted / Ended + Tick). `USunsetCovePlayerPreferences` | `[SunsetCove.Input] SprintMode` (0 Hold, 1 Toggle) |
+| Hints | **On** (default) / **Off**. Off hides every on-screen help at once, also mid-game: the suggestion feed (`USunsetCoveHUDSubsystem` drops new messages, one-time tips are not used up; lines on screen are cleared) and the interaction prompt (`UHUDInteractionPromptWidget::ShouldBeVisible`). `USunsetCovePlayerPreferences::AreHintsEnabled` (cached) | `[SunsetCove.Input] ShowHints` (True / False) |
 | Controller Icons | see 10 | `[SunsetCove.Input]` |
 
 ---

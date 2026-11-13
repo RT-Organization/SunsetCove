@@ -4,6 +4,7 @@
 #include "UISystem/HUD/SunsetCoveHUDSubsystem.h"
 
 #include "Core/Logging/SunsetCoveLog.h"
+#include "Core/Settings/SunsetCovePlayerPreferences.h"
 #include "Engine/DataTable.h"
 #include "Engine/Engine.h"
 #include "Engine/GameInstance.h"
@@ -29,6 +30,7 @@ void USunsetCoveHUDSubsystem::Deinitialize()
 	OnCrosshairHideRequestChanged.Clear();
 	PendingNotifications.Reset();
 	CrosshairHideReasons.Reset();
+	PromptHideReasons.Reset();
 	NotificationTable = nullptr;
 
 	Super::Deinitialize();
@@ -40,7 +42,8 @@ void USunsetCoveHUDSubsystem::Deinitialize()
 
 bool USunsetCoveHUDSubsystem::ShowNotificationById(FName NotificationId)
 {
-	if (NotificationId.IsNone())
+	// Hints off (Settings > Controls): nothing is shown, and a one-time tip is not used up, so it still shows once hints are back.
+	if (NotificationId.IsNone() || !USunsetCovePlayerPreferences::AreHintsEnabled())
 	{
 		return false;
 	}
@@ -85,7 +88,7 @@ void USunsetCoveHUDSubsystem::ShowNotification(const FText& Message, float Durat
 
 void USunsetCoveHUDSubsystem::PushNotification(const FHUDNotification& Notification)
 {
-	if (Notification.Message.IsEmpty())
+	if (Notification.Message.IsEmpty() || !USunsetCovePlayerPreferences::AreHintsEnabled())
 	{
 		return;
 	}
@@ -166,5 +169,26 @@ void USunsetCoveHUDSubsystem::SetCrosshairHiddenBy(FName Reason, bool bHidden)
 	if (bIsHidden != bWasHidden)
 	{
 		OnCrosshairHideRequestChanged.Broadcast(bIsHidden);
+	}
+}
+
+// ----------------------------------------------------------------------
+// Interaction prompts
+// ----------------------------------------------------------------------
+
+void USunsetCoveHUDSubsystem::SetInteractionPromptsHiddenBy(FName Reason, bool bHidden)
+{
+	if (Reason.IsNone())
+	{
+		return;
+	}
+
+	if (bHidden)
+	{
+		PromptHideReasons.Add(Reason);
+	}
+	else
+	{
+		PromptHideReasons.Remove(Reason);
 	}
 }

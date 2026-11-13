@@ -65,6 +65,13 @@ Rule: game code and data name a **cue tag** (`Audio.Cue.UI.Click`), never a soun
 | `USunsetCoveVolumeRowWidget` | `AudioSystem/Widgets/SunsetCoveVolumeRowWidget.h` | One slider line for **one** category, built on the framework's slider row (same look, keys and focus as every settings row). Reads/writes the subsystem; holds no audio state; plays its `PreviewCue` when the slider is released. Parent of `WBP_VolumeRow`. |
 | `USunsetCoveAudioTabWidget` | `AudioSystem/Widgets/SunsetCoveAudioTabWidget.h` | Parent of `WBP_Tab_Audio`. Finds every row in its layout and implements Apply / Revert of the framework tab contract. |
 | `ASunsetCoveMainMenuGameMode`, `ASunsetCoveGameplayGameMode` | `Core/` | Each has `MapAudio` (Class Defaults > Audio) and calls `MapAudio.Apply(this)` in `BeginPlay`. |
+| `ASunsetCoveWindAmbience` (`BP_WindAmbience`) | `AudioSystem/Ambience/SunsetCoveWindAmbience.h` | The wind of a gameplay level: 2D loop (`Audio.Cue.Ambient.Wind`), volume = shore proximity (asked to the sea) × shelter (8 horizontal rays: rocks close around the listener quiet it). Placed once per level. |
+| `ASunsetCoveSea` (`BP_Sea`) | `Environment/Water/SunsetCoveSea.h` | Owns the **waves on the beach** sound: `Audio.Cue.Ambient.ShoreWaves` attached to an emitter that slides along the shoreline spline to the point closest to the listener; built-in attenuation when the cue has none. See `Docs/Environment/Sea_Architecture.md`. |
+| `USunsetCoveFootstepComponent` (on `BP_Character`), `USunsetCoveFootstepSet` (`DA_Footsteps`) | `AudioSystem/Footsteps/` | Step and landing sounds chosen by the ground under the feet (physical material of landscape layer / mesh, or the sea). See `Footsteps.md`. |
+
+**Two kinds of ambience.** A *map* ambience is a 2D layer of the GameMode (`MapAudio.AmbientCue`, crossfaded between maps: the
+main menu waves). A *world* ambience belongs to places in a level and is played by actors there (the sea, the wind; later
+seagulls, a bar's music). The gameplay GameMode has no map ambience: the cove is heard through its world ambience.
 
 No new module dependency: `SunsetCove.Build.cs` already lists `CoreFramework`, `UMG`, `CommonUI`, `GameplayTags`.
 
@@ -93,7 +100,7 @@ The framework doc suggests shared Sound Classes and a template config inside `Co
 | File | Section | Content |
 |---|---|---|
 | `Config/DefaultGame.ini` | `[/Script/CoreFramework.AudioFrameSettings]` | `DefaultAudioConfig=/Game/Audio/DA_AudioConfig.DA_AudioConfig` |
-| `Config/DefaultGameplayTags.ini` | GameplayTagsSettings | `Audio.Cue.*` tags (UI.Hover/Click/PopupOpen/PopupClose, Music.MainMenu/Gameplay, Ambient.Beach) |
+| `Config/DefaultGameplayTags.ini` | GameplayTagsSettings | `Audio.Cue.*` tags (UI.Hover/Click/PopupOpen/PopupClose, Music.MainMenu/Gameplay, Ambient.MainMenu/ShoreWaves/Wind) + a redirect Ambient.Beach → Ambient.MainMenu (old name) |
 | `Saved/Config/Windows/GameUserSettings.ini` (per player, written at runtime) | `[CoreFramework.Audio]` | `Volume.<CategoryTag>=0.8`, `Mute.<CategoryTag>=False` |
 
 The five category tags `CoreFramework.Audio.Category.{Master,SFX,Music,Ambient,UI}` are **native** (C++, `FAudioTags`); they are not in the `.ini`.
@@ -113,14 +120,14 @@ Player drags the Music slider (WBP_VolumeRow, Category = CoreFramework.Audio.Cat
  │        │      (in memory; written to disk by SaveAudioSettings or at game-instance shutdown)
  │        ├─ EnsureMixApplied(): first time in this world -> SetBaseSoundMix(World, internal mix) + every category
  │        ├─ ApplyCategoryVolume(Music, VolumeFadeTime 0.05 s)
- │        │      SetSoundMixClassOverride(Mix, SC_Music, 0.6, pitch 1, fade, bApplyToChildren = false)
+ │        │      SetSoundMixClassOverride(Mix, SC_Music, 0.6, pitch 1, fade, bApplyToChildren = true)
  │        └─ OnCategoryVolumeChanged.Broadcast(Music, 0.6)
  │                └─ every row whose Category == Music -> RefreshFromAudio() (guarded, no write-back)
  │
  └─ Engine: final volume of a music voice = SC_Master volume × SC_Music volume × cue volume × sound volume
 ```
 
-- **Master scales everything** through the Sound Class tree, not through code. `bApplyToChildren = false` stays false on purpose (otherwise Master would count twice).
+- **Master scales everything**: each category's mix adjuster is applied with `bApplyToChildren = true`, so Master reaches SFX, Music, Ambient and UI. (Until 2026-11-13 the framework used `false`, believing the Sound Class tree would propagate it; the engine applies mix adjusters *after* propagating the tree, so Master did nothing. Fixed in the framework.)
 - **Mute** (framework API, no widget in the Settings page any more) sets the class override to 0 without losing the slider value. The audio tab still snapshots and restores it, so a game feature that mutes a category is respected by Revert.
 - **Every sound played through the framework is forced into its category's Sound Class** (`SoundClassOverride` on the Audio Component), so a sound asset with no Sound Class still obeys the slider when played through a cue. A sound played *outside* the framework (a placed *Ambient Sound* actor, a Niagara sound, a Blueprint *Play Sound 2D*) obeys the sliders only if its asset has a Sound Class set. The setup guide therefore asks to set the Sound Class on every imported asset.
 - **Pause**: the UI category always plays while paused; Music too because its row in `DA_AudioConfig` has *Play When Paused* ticked.
@@ -168,11 +175,13 @@ Who triggers what in Sunset Cove today:
 ### 5.1 Music across maps
 
 ```
-L_MainMenu begins play -> MapAudio(Music.MainMenu, Ambient.Beach) -> PlayMusic(MainMenu), PlayAmbient(Beach)
+L_MainMenu begins play -> MapAudio(Music.MainMenu, Ambient.MainMenu) -> PlayMusic(MainMenu), PlayAmbient(MainMenu waves)
 New Game / Continue -> OpenLevel(L_Gameplay)        (music components ignore level flushing: they keep playing)
-L_Gameplay begins play -> MapAudio(Music.Gameplay, Ambient.Beach)
+L_Gameplay begins play -> MapAudio(Music.Gameplay, no ambient)
       PlayMusic(Gameplay)   -> MainMenu fades out, Gameplay fades in (DefaultMusicFadeTime, equal power)
-      PlayAmbient(Beach)    -> already playing -> nothing happens (no restart)
+      StopAmbient()         -> the menu waves fade out
+      BP_Sea (BeginPlay)    -> PlayCueAttached(ShoreWaves) on the emitter that slides along the shoreline
+      BP_WindAmbience       -> PlayCue2D(Wind), volume updated every 0.15 s (shore distance x shelter)
 ```
 
 An empty `MusicCue` means *this map is silent*, so the framework stops the music. To keep one track across two map types, give both the same cue.

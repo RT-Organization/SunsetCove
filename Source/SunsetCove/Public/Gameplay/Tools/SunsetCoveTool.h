@@ -19,7 +19,9 @@
 //   Tools are never consumed: they are used forever (GDD).
 //
 // COMPONENTS
-//   CollisionBody (root)   An invisible box: the thing the interaction trace hits, and what falls when the tool is dropped.
+//   CollisionBody (root)   An invisible box (USunsetCovePivotBoxComponent): the thing the interaction trace hits, and what falls
+//                          when the tool is dropped. Its origin is the center of its BOTTOM face, so the tool stands on the point
+//                          it is placed or spawned at (CollisionBody > Origin).
 //                          Its size comes from the mesh (bAutoFitCollisionToMesh), so you never size it by hand.
 //   ToolMesh               The skeletal mesh (visual only, no collision). Tools may animate, like props do.
 //
@@ -27,7 +29,7 @@
 //   GripSocketName names a bone (or a socket) of the tool's skeleton, created by the animator in Blender (default "Grip_R").
 //   When the tool is picked up, the system places the tool so that THIS bone lands exactly on the hand socket of the arms
 //   (Tool_R, or Prop_R when the arms have no Tool_R). HoldLocationOffset / HoldRotationOffset are a small per-tool fine tune
-//   on top of it. Without a grip bone the center of the tool is placed on the hand socket, and one warning says so.
+//   on top of it. Without a grip bone the root of the tool (its base) is placed on the hand socket, and one warning says so.
 //   Same math and same rules as props (Public/Core/Utils/SunsetCoveHeldItemUtils.h).
 //
 // USING A TOOL (the part you change per tool)
@@ -60,7 +62,7 @@
 #include "SunsetCoveTool.generated.h"
 
 class UAnimationAsset;
-class UBoxComponent;
+class USunsetCovePivotBoxComponent;
 class USkeletalMeshComponent;
 class UTexture2D;
 
@@ -97,7 +99,7 @@ public:
 
 	/** The root: invisible box that carries collision, physics and the attachment to the hand. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tool|Components")
-	TObjectPtr<UBoxComponent> CollisionBody;
+	TObjectPtr<USunsetCovePivotBoxComponent> CollisionBody;
 
 	/** The skeletal mesh (visual only, no collision). Set its Skeletal Mesh Asset in the Blueprint. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Tool|Components")
@@ -143,11 +145,11 @@ public:
 	// Collision and physics (while the tool lies in the world or after a drop)
 	// ------------------------------------------------------------------
 
-	/** True: the box is sized from the bounds of the mesh and the mesh is centered in it. False: you size it with CollisionBoxExtent and place the mesh yourself. */
+	/** True: the box is sized from the bounds of the mesh and the mesh is placed in it (base on the origin). False: you size it with CollisionBoxExtent and place the mesh yourself. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tool|Collision")
 	bool bAutoFitCollisionToMesh = true;
 
-	/** Extra size added on every side of the auto-fitted box (cm). A little extra makes the tool easier to aim at. */
+	/** Extra size added on the sides and the top of the auto-fitted box (cm), never under the base. A little extra makes the tool easier to aim at. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tool|Collision", meta = (ClampMin = "0.0", Units = "cm", EditCondition = "bAutoFitCollisionToMesh"))
 	float CollisionPadding = 2.0f;
 
@@ -178,6 +180,10 @@ public:
 	/** Press: one use per click. Hold: repeats while the action is held. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tool|Use")
 	EToolUseMode UseMode = EToolUseMode::Press;
+
+	/** Verb of the HUD prompt of the use action while this tool is equipped ("Spray", "Fill", "Throw toy"). Empty: the Tool Inventory's default ("Use"). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tool|Use")
+	FText UsePromptText;
 
 	/** Minimum time between two uses (seconds). 0 = none. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Tool|Use", meta = (ClampMin = "0.0", Units = "s"))

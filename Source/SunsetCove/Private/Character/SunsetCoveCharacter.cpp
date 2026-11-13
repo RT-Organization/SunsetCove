@@ -4,6 +4,7 @@
 #include "Character/SunsetCoveCharacter.h"
 
 #include "AnimationSystem/ArmsAnimation/ArmsAnimationComponent.h"
+#include "AudioSystem/Footsteps/SunsetCoveFootstepComponent.h"
 #include "Core/Settings/SunsetCovePlayerPreferences.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/InputComponent.h"
@@ -33,6 +34,7 @@ ASunsetCoveCharacter::ASunsetCoveCharacter(const FObjectInitializer& ObjectIniti
 	PropInventory = CreateDefaultSubobject<UPropInventoryComponent>(TEXT("PropInventory"));
 	ToolInventory = CreateDefaultSubobject<UToolInventoryComponent>(TEXT("ToolInventory"));
 	ArmsAnimation = CreateDefaultSubobject<UArmsAnimationComponent>(TEXT("ArmsAnimation"));
+	Footsteps = CreateDefaultSubobject<USunsetCoveFootstepComponent>(TEXT("Footsteps"));
 
 	// Default HUD messages of the tool refusals (rows of DT_HUDNotifications). Editable in BP_Character > Class Defaults.
 	ToolRefusalNotifications.Add(EToolRefusal::HandsBusy, TEXT("Tool.Refused.HandsBusy"));

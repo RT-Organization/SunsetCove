@@ -29,7 +29,9 @@ UInteractionComponent::UInteractionComponent()
 void UInteractionComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	Handlers.Reset();
+	PromptProviders.Reset();
 	FocusedActor.Reset();
+	SetCurrentPrompts(TArray<FInteractionPrompt>());
 
 	Super::EndPlay(EndPlayReason);
 }
@@ -42,6 +44,10 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	if (!IsOwnerLocallyControlled())
 	{
 		SetFocusedActor(nullptr);
+		if (CurrentPrompts.Num() > 0)
+		{
+			SetCurrentPrompts(TArray<FInteractionPrompt>());
+		}
 		return;
 	}
 
@@ -53,6 +59,10 @@ void UInteractionComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	TimeSinceFocusUpdate = 0.0f;
 
 	SetFocusedActor(FindInteractionTarget());
+
+	// The prompts follow the focus and the state of the hands, at the same rate (polling a few providers is cheaper and safer
+	// than every system telling this class about every change).
+	RefreshPrompts();
 }
 
 // ----------------------------------------------------------------------
@@ -80,7 +90,8 @@ void UInteractionComponent::SetupInput(UEnhancedInputComponent* EnhancedInput)
 	EnhancedInput->BindAction(InteractAction, ETriggerEvent::Started, this, &UInteractionComponent::HandleInteractInput);
 }
 
-void UInteractionComponent::RegisterInteractionHandler(FName HandlerId, const FInteractionCanHandleDelegate& CanHandle, const FInteractionHandleDelegate& Handle)
+void UInteractionComponent::RegisterInteractionHandler(FName HandlerId, const FInteractionCanHandleDelegate& CanHandle, const FInteractionHandleDelegate& Handle,
+	const FInteractionTargetPromptDelegate& Prompt)
 {
 	if (HandlerId.IsNone())
 	{
@@ -91,6 +102,7 @@ void UInteractionComponent::RegisterInteractionHandler(FName HandlerId, const FI
 	FInteractionHandler NewHandler;
 	NewHandler.CanHandle = CanHandle;
 	NewHandler.Handle = Handle;
+	NewHandler.Prompt = Prompt;
 
 	// Same id again replaces the old handler and keeps its place in the order.
 	for (TPair<FName, FInteractionHandler>& Entry : Handlers)
@@ -110,6 +122,34 @@ void UInteractionComponent::UnregisterInteractionHandler(FName HandlerId)
 	Handlers.RemoveAll([HandlerId](const TPair<FName, FInteractionHandler>& Entry)
 	{
 		return Entry.Key == HandlerId;
+	});
+}
+
+void UInteractionComponent::RegisterPromptProvider(FName ProviderId, const FInteractionContextPromptDelegate& Provider)
+{
+	if (ProviderId.IsNone())
+	{
+		UE_LOG(LogSunsetCove, Warning, TEXT("Interaction: a prompt provider needs a name. Registration ignored."));
+		return;
+	}
+
+	for (TPair<FName, FInteractionContextPromptDelegate>& Entry : PromptProviders)
+	{
+		if (Entry.Key == ProviderId)
+		{
+			Entry.Value = Provider;
+			return;
+		}
+	}
+
+	PromptProviders.Emplace(ProviderId, Provider);
+}
+
+void UInteractionComponent::UnregisterPromptProvider(FName ProviderId)
+{
+	PromptProviders.RemoveAll([ProviderId](const TPair<FName, FInteractionContextPromptDelegate>& Entry)
+	{
+		return Entry.Key == ProviderId;
 	});
 }
 
@@ -169,8 +209,81 @@ bool UInteractionComponent::Interact()
 
 	// The interaction may have changed what is interactable (a grabbed prop is gone from the world).
 	SetFocusedActor(FindInteractionTarget());
+	RefreshPrompts();
 
 	return bHandled;
+}
+
+void UInteractionComponent::RefreshPrompts()
+{
+	TArray<FInteractionPrompt> Prompts;
+	if (IsOwnerLocallyControlled())
+	{
+		BuildPrompts(Prompts);
+	}
+	SetCurrentPrompts(MoveTemp(Prompts));
+}
+
+void UInteractionComponent::BuildPrompts(TArray<FInteractionPrompt>& OutPrompts) const
+{
+	// 1. The focus: the same order as Interact (interface first, then the first handler that accepts it).
+	if (AActor* Focus = FocusedActor.Get())
+	{
+		if (Focus->Implements<UInteractableInterface>() && !IInteractableInterface::Execute_IsInteractionBlocked(Focus, GetOwner()))
+		{
+			const FText Text = IInteractableInterface::Execute_GetInteractionPrompt(Focus);
+			if (!Text.IsEmpty())
+			{
+				OutPrompts.Emplace(Text, InteractAction.Get());
+			}
+		}
+		else
+		{
+			for (const TPair<FName, FInteractionHandler>& Entry : Handlers)
+			{
+				const FInteractionHandler& Handler = Entry.Value;
+				if (Handler.CanHandle.IsBound() && Handler.CanHandle.Execute(Focus))
+				{
+					Handler.Prompt.ExecuteIfBound(Focus, OutPrompts);
+					break;
+				}
+			}
+		}
+	}
+
+	// 2. What the hands can do, whatever is aimed at.
+	for (const TPair<FName, FInteractionContextPromptDelegate>& Entry : PromptProviders)
+	{
+		Entry.Value.ExecuteIfBound(OutPrompts);
+	}
+
+	// A prompt without its own action uses Interact; a prompt with no action at all cannot show a key and is dropped.
+	for (FInteractionPrompt& Prompt : OutPrompts)
+	{
+		if (!Prompt.InputAction)
+		{
+			Prompt.InputAction = InteractAction;
+		}
+	}
+	OutPrompts.RemoveAll([](const FInteractionPrompt& Prompt) { return !Prompt.InputAction || Prompt.ActionText.IsEmpty(); });
+
+	OutPrompts.StableSort([](const FInteractionPrompt& A, const FInteractionPrompt& B) { return A.SortOrder < B.SortOrder; });
+}
+
+void UInteractionComponent::SetCurrentPrompts(TArray<FInteractionPrompt>&& Prompts)
+{
+	bool bSame = Prompts.Num() == CurrentPrompts.Num();
+	for (int32 Index = 0; bSame && Index < Prompts.Num(); ++Index)
+	{
+		bSame = Prompts[Index].IsSameAs(CurrentPrompts[Index]);
+	}
+	if (bSame)
+	{
+		return;
+	}
+
+	CurrentPrompts = MoveTemp(Prompts);
+	OnPromptsChanged.Broadcast(CurrentPrompts);
 }
 
 FText UInteractionComponent::GetFocusedPrompt() const

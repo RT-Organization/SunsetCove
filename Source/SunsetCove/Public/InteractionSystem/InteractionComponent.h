@@ -16,7 +16,17 @@
 // FOCUS
 //   While the owner is locally controlled, a trace from the camera runs every FocusUpdateInterval seconds. The first
 //   thing the trace hits becomes the focus if it is interactable (blocked by a wall means no focus). OnFocusChanged
-//   tells the future prompt widget; GetFocusedActor and GetFocusedPrompt answer on demand.
+//   tells listeners; GetFocusedActor and GetFocusedPrompt answer on demand.
+//
+// PROMPTS ("E  Pick up Sunbed", "[RT] Place (Hold)")
+//   After every focus update the component builds the list of what the player can do now (FInteractionPrompt, see
+//   InteractionTypes.h) and fires OnPromptsChanged when it differs from the last one. Two sources:
+//     * the FOCUS: the interface's GetInteractionPrompt, or the Prompt delegate of the handler that accepts the focus
+//       ("Pick up" + the item name). They use the Interact action;
+//     * CONTEXT providers (RegisterPromptProvider): what the hands can do whatever is aimed at (place / throw / drop a prop,
+//       use a tool), each with its own Input Action.
+//   A prompt names an Input Action, never a key: the HUD (UHUDInteractionPromptWidget) shows the key of that action on the
+//   device in use, remaps included, and switches when the player changes device. This class includes no UI.
 //
 // HIERARCHY AND OWNER
 //   UActorComponent -> UInteractionComponent, created by ASunsetCoveCharacter (the composition root of the project),
@@ -46,6 +56,9 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FInteractionFocusChangedSignature, 
 
 /** The player pressed Interact on Target. bHandled is false if nothing could deal with it. */
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FInteractionPerformedSignature, AActor*, Target, bool, bHandled);
+
+/** The prompt list changed (what the player can do now). Prompts is sorted and may be empty (hide the prompt). */
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FInteractionPromptsChangedSignature, const TArray<FInteractionPrompt>&, Prompts);
 
 UCLASS(ClassGroup = (SunsetCove), meta = (BlueprintSpawnableComponent))
 class SUNSETCOVE_API UInteractionComponent : public UActorComponent
@@ -99,10 +112,20 @@ public:
 	 * Plugs a system into the interaction. HandlerId names it (registering the same id again replaces it). CanHandle runs while
 	 * the player aims, Handle runs when Interact is pressed. See the notes at the top of this file.
 	 */
-	void RegisterInteractionHandler(FName HandlerId, const FInteractionCanHandleDelegate& CanHandle, const FInteractionHandleDelegate& Handle);
+	void RegisterInteractionHandler(FName HandlerId, const FInteractionCanHandleDelegate& CanHandle, const FInteractionHandleDelegate& Handle,
+		const FInteractionTargetPromptDelegate& Prompt = FInteractionTargetPromptDelegate());
 
 	/** Removes a handler. Unknown ids are ignored. */
 	void UnregisterInteractionHandler(FName HandlerId);
+
+	/**
+	 * Adds a context prompt provider: what the player can do now whatever is aimed at (see PROMPTS at the top). ProviderId names
+	 * it (the same id again replaces it, keeping its place).
+	 */
+	void RegisterPromptProvider(FName ProviderId, const FInteractionContextPromptDelegate& Provider);
+
+	/** Removes a prompt provider. Unknown ids are ignored. */
+	void UnregisterPromptProvider(FName ProviderId);
 
 	// ------------------------------------------------------------------
 	// Commands and queries
@@ -120,6 +143,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Interaction")
 	FText GetFocusedPrompt() const;
 
+	/** What the player can do now (focus + context), sorted by SortOrder. Updated with the focus. Every InputAction is set. */
+	UFUNCTION(BlueprintPure, Category = "Interaction|Prompts")
+	const TArray<FInteractionPrompt>& GetCurrentPrompts() const { return CurrentPrompts; }
+
+	/** Builds the prompt list now (instead of at the next focus update) and fires OnPromptsChanged if it changed. */
+	UFUNCTION(BlueprintCallable, Category = "Interaction|Prompts")
+	void RefreshPrompts();
+
+	/** The Interact action (what a focus prompt without its own action uses). */
+	UFUNCTION(BlueprintPure, Category = "Interaction")
+	UInputAction* GetInteractAction() const { return InteractAction; }
+
 	// ------------------------------------------------------------------
 	// Events
 	// ------------------------------------------------------------------
@@ -131,6 +166,10 @@ public:
 	/** Fires after every Interact press that had a focus. */
 	UPROPERTY(BlueprintAssignable, Category = "Interaction")
 	FInteractionPerformedSignature OnInteracted;
+
+	/** Fires when the prompt list changes. The HUD prompt binds here. */
+	UPROPERTY(BlueprintAssignable, Category = "Interaction|Prompts")
+	FInteractionPromptsChangedSignature OnPromptsChanged;
 
 private:
 	/** Input callback of InteractAction. */
@@ -152,6 +191,19 @@ private:
 
 	/** Weak on purpose: the focus must never keep an actor alive. */
 	TWeakObjectPtr<AActor> FocusedActor;
+
+	/** Builds the prompts of the focus and of the providers, sorted. */
+	void BuildPrompts(TArray<FInteractionPrompt>& OutPrompts) const;
+
+	/** Stores Prompts and broadcasts when they differ from the current ones. */
+	void SetCurrentPrompts(TArray<FInteractionPrompt>&& Prompts);
+
+	/** Context prompt providers in registration order. Native delegates only. */
+	TArray<TPair<FName, FInteractionContextPromptDelegate>> PromptProviders;
+
+	/** Last built prompt list (what GetCurrentPrompts returns). UPROPERTY: it holds Input Action pointers. */
+	UPROPERTY(Transient)
+	TArray<FInteractionPrompt> CurrentPrompts;
 
 	float TimeSinceFocusUpdate = 0.0f;
 	bool bWarnedMissingAction = false;

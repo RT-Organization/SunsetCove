@@ -12,8 +12,9 @@
 ```
 Game starts → GameDefaultMap = L_MainMenu
   World Settings: GameMode Override = BP_GameMode_MainMenu (no pawn, HUD = BP_Startup_MainMenu)
-  L_MainMenu contains: MenuCamera (Auto Activate for Player 0) looking at the cove at sunset
-                       a Level Instance of L_MapBlockout (the cove)  +  PP_MenuSunset (warm grade)
+  L_MainMenu contains ONLY: World Settings + LI_MainMenuMap (a Level Instance of L_MainMenuMap)
+  L_MainMenuMap contains:   the whole menu environment (sky, light, fog, beach meshes)
+                            + MenuCamera (Auto Activate for Player 0) + PP_MenuSunset (warm grade)
   BP_Startup_MainMenu (ABaseHUD) → UUIFrameSubsystem pushes UI.Screen.MainMenu
       DA_UIConfig > Screens: UI.Screen.MainMenu → WBP_MainMenu (Menu layer, UI Only input)
           WBP_MainMenu activates → asks USunsetCoveGameFlowSubsystem: "does the world save exist?"
@@ -22,18 +23,32 @@ Game starts → GameDefaultMap = L_MainMenu
 
 The widget has **no background**: it is drawn over the 3D view of the menu camera.
 
-**The menu level (`L_MainMenu`)**
+**The menu map (`L_MainMenu`) — kept empty on purpose (2026-11-12)**
 
 | Actor | Setting |
 |---|---|
 | World Settings | GameMode Override = `BP_GameMode_MainMenu` (without it the map would use the global gameplay GameMode and spawn the character) |
-| `Cove_LevelInstance` | Level Instance of `L_MapBlockout`: the cove, its sky and its light, without copying any art |
+| `LI_MainMenuMap` | Level Instance of **`L_MainMenuMap`**, at the origin, no rotation / scale (so positions inside the instance are world positions) |
+
+Nothing else goes in `L_MainMenu` (the `Brush_0` builder brush and the engine's own default actors are always there). The
+menu map is the *frame*: game mode + "load the menu scene". All the design lives in the instanced level.
+
+**The menu scene (`L_MainMenuMap`, built and edited as a normal level)**
+
+| Actor | Setting |
+|---|---|
+| environment | sky atmosphere, directional light, sky light, fog, volumetric clouds, the beach meshes |
 | `MenuCamera` | Camera Actor, **Auto Activate for Player = Player 0**, at (−2000, −1500, 3800), pitch −12, yaw 2, FOV 80, *Constrain Aspect Ratio* off (no black bars on any screen ratio). Frames the beach, the sea and the horizon; the dark rock on the right sits behind the logo |
-| `PP_MenuSunset` | Post Process Volume, **Unbound**, priority 10: white balance 4300 K, warm gain, slight vignette, −0.4 exposure. A sunset mood for the menu only |
+| `PP_MenuSunset` | Post Process Volume, **Unbound**, priority 10: white balance 4300 K, warm saturation / gain, vignette 0.55, −0.4 exposure. A sunset mood for the menu only |
+| `PlayerStart_1` | harmless (the menu game mode spawns no pawn) |
+
+**How to edit the menu scene:** open `L_MainMenuMap` directly (it is a normal level), or in `L_MainMenu` select `LI_MainMenuMap` >
+*Level Instance > Edit*, change things, then *Commit*. Never add actors to `L_MainMenu` itself. The camera works from inside
+the instance because a Camera Actor with Auto Activate registers itself with the player controller whatever level it is in.
 
 `Project Settings > Maps & Modes > Game Default Map` = `L_MainMenu` (a packaged game starts on the menu; the editor startup map is unchanged).
 
-*Limitation:* the blockout's sun is a fixed midday light. A level instance cannot change it without editing `L_MapBlockout`, so the sunset look is the post process. When the final cove map exists with the Day/Night manager, replace the level instance and set its time to sunset (19:00, paused) for the menu.
+*Limitation:* the sun of `L_MainMenuMap` is a fixed light, so the sunset look comes from the post process. When the final cove art exists, rebuild `L_MainMenuMap` with it (or put a Day/Night manager set to sunset, paused, in it); `L_MainMenu` does not change.
 
 | Piece | Asset / class | Role |
 |---|---|---|
@@ -173,7 +188,7 @@ Slate sends a synthetic mouse-move (cursor unmoved, zero delta) after every layo
 | Popup look | `WBP_Popup_Confirm`, `BP_TextStyle_Popup*` |
 | Options screen | `WBP_MainMenu` > Class Defaults > **Options Screen Tag** (+ `DA_UIConfig` > Screens) |
 | Which map New Game / Continue opens, slot name | Project Settings > Game > **Sunset Cove Game Flow** |
-| Menu background view | `L_MainMenu` > `MenuCamera` (move it), `PP_MenuSunset` (warm grade); replace the `L_MapBlockout` level instance with the final cove map when it exists |
+| Menu background view | `L_MainMenuMap` > `MenuCamera` (move it), `PP_MenuSunset` (warm grade), any environment actor. `L_MainMenu` only holds the level instance |
 | Add a menu entry | add a `WBP_Button_Menu` to `MenuButtons`; for logic add a `BindWidget` button + handler in `USunsetCoveMainMenuWidget` |
 | Reset the save while testing | delete `Saved/SaveGames/CF_Slot_World.sav` and `CF_Index.sav`, or press New Game and confirm |
 

@@ -4,7 +4,7 @@
 #include "Gameplay/Props/SunsetCoveProp.h"
 
 #include "Animation/AnimationAsset.h"
-#include "Components/BoxComponent.h"
+#include "Core/Components/SunsetCovePivotBoxComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Core/Logging/SunsetCoveLog.h"
 #include "Core/Utils/SunsetCoveHeldItemUtils.h"
@@ -16,7 +16,7 @@ ASunsetCoveProp::ASunsetCoveProp()
 	PrimaryActorTick.bCanEverTick = false;
 
 	// Root: the invisible box. A Movable primitive with simple collision is exactly what the Prop Inventory requires.
-	CollisionBody = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBody"));
+	CollisionBody = CreateDefaultSubobject<USunsetCovePivotBoxComponent>(TEXT("CollisionBody"));
 	SetRootComponent(CollisionBody);
 	CollisionBody->SetMobility(EComponentMobility::Movable);
 	CollisionBody->InitBoxExtent(CollisionBoxExtent);
@@ -82,11 +82,11 @@ void ASunsetCoveProp::ApplyCollisionSetup()
 
 	if (bAutoFitCollisionToMesh && PropMesh)
 	{
-		// The root is the center of the box, and the center of the box is where the physics turns the prop around. So
-		// the mesh is moved until its own center is on the root.
+		// The root is the center of the BOTTOM of the box (the base of the prop, CollisionBody->Origin), so the mesh is moved until
+		// its base is on the root: the prop stands on the point it is put at. Physics still turns it around the center of the box.
 		FVector FittedExtent;
 		FVector MeshLocation;
-		if (SunsetCoveHeldItem::ComputeFittedBox(PropMesh, CollisionPadding, FittedExtent, MeshLocation))
+		if (SunsetCoveHeldItem::ComputeFittedBox(PropMesh, CollisionPadding, CollisionBody->Origin, FittedExtent, MeshLocation))
 		{
 			Extent = FittedExtent;
 			PropMesh->SetRelativeLocation(MeshLocation);
@@ -202,16 +202,10 @@ bool ASunsetCoveProp::GetPropPlacementBounds_Implementation(FBox& OutLocalBounds
 
 	// The base of the prop is the bottom of its collision box. The box is fitted once, from the reference (open) pose of the mesh, so
 	// it does not depend on the pose the prop is carried in. The padding that makes the box easier to aim at is not part of the prop:
-	// it is taken off, so the prop stands ON the ground and not a little above it. The root is the center of the box.
-	FVector Extent = CollisionBody->GetUnscaledBoxExtent();
-	if (bAutoFitCollisionToMesh)
-	{
-		Extent -= FVector(CollisionPadding);
-	}
-	Extent = Extent.ComponentMax(FVector(1.0f));
-
-	OutLocalBounds = FBox(-Extent, Extent);
-	return true;
+	// it is taken off, so the prop stands ON the ground and not a little above it. With the default origin (Bottom) the root is the
+	// base itself, so the footprint starts at Z = 0 and the Prop Inventory puts the root right on the surface.
+	OutLocalBounds = SunsetCoveHeldItem::ComputeFootprint(CollisionBody, bAutoFitCollisionToMesh ? CollisionPadding : 0.0f);
+	return OutLocalBounds.IsValid != 0;
 }
 
 bool ASunsetCoveProp::GetPropPlacementPreviewPose_Implementation(UAnimationAsset*& OutAsset, float& OutTime) const

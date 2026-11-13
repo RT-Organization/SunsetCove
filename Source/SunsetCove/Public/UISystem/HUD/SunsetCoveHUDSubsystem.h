@@ -95,6 +95,18 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "SunsetCove|HUD")
 	FHUDCrosshairHideRequestChangedSignature OnCrosshairHideRequestChanged;
 
+	// ------------------------------------------------------------------
+	// Interaction prompts (what the player can do + the key, WBP_InteractionPrompt)
+	// ------------------------------------------------------------------
+
+	/** Same rules as SetCrosshairHiddenBy, for the interaction prompt (a cutscene, a dialogue that owns the screen). */
+	UFUNCTION(BlueprintCallable, Category = "SunsetCove|HUD")
+	void SetInteractionPromptsHiddenBy(FName Reason, bool bHidden);
+
+	/** True while at least one system asked to hide the interaction prompt. */
+	UFUNCTION(BlueprintPure, Category = "SunsetCove|HUD")
+	bool AreInteractionPromptsHiddenByRequest() const { return PromptHideReasons.Num() > 0; }
+
 private:
 	/** The table of Project Settings, loaded on first use (a small table of texts). Null if none is set. */
 	const UDataTable* ResolveNotificationTable();
@@ -112,6 +124,8 @@ private:
 	TSet<FName> WarnedMissingIds;
 
 	TSet<FName> CrosshairHideReasons;
+
+	TSet<FName> PromptHideReasons;
 
 	bool bTableResolved = false;
 };

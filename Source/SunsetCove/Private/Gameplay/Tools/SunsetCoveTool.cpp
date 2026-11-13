@@ -5,7 +5,7 @@
 
 #include "Animation/AnimationAsset.h"
 #include "CollisionQueryParams.h"
-#include "Components/BoxComponent.h"
+#include "Core/Components/SunsetCovePivotBoxComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Core/Logging/SunsetCoveLog.h"
 #include "Core/Utils/SunsetCoveHeldItemUtils.h"
@@ -20,7 +20,7 @@ ASunsetCoveTool::ASunsetCoveTool()
 	PrimaryActorTick.bCanEverTick = false;
 
 	// Root: the invisible box. Same structure as a prop: a Movable primitive with simple collision.
-	CollisionBody = CreateDefaultSubobject<UBoxComponent>(TEXT("CollisionBody"));
+	CollisionBody = CreateDefaultSubobject<USunsetCovePivotBoxComponent>(TEXT("CollisionBody"));
 	SetRootComponent(CollisionBody);
 	CollisionBody->SetMobility(EComponentMobility::Movable);
 	CollisionBody->InitBoxExtent(CollisionBoxExtent);
@@ -90,11 +90,11 @@ void ASunsetCoveTool::ApplyCollisionSetup()
 
 	if (bAutoFitCollisionToMesh && ToolMesh)
 	{
-		// The root is the center of the box, and the center of the box is where the physics turns the tool around. So
-		// the mesh is moved until its own center is on the root.
+		// The root is the center of the BOTTOM of the box (CollisionBody->Origin), so the mesh is moved until its base is on the
+		// root: a tool spawned or dropped at a ground point stands on it. Physics still turns it around the center of the box.
 		FVector FittedExtent;
 		FVector MeshLocation;
-		if (SunsetCoveHeldItem::ComputeFittedBox(ToolMesh, CollisionPadding, FittedExtent, MeshLocation))
+		if (SunsetCoveHeldItem::ComputeFittedBox(ToolMesh, CollisionPadding, CollisionBody->Origin, FittedExtent, MeshLocation))
 		{
 			Extent = FittedExtent;
 			ToolMesh->SetRelativeLocation(MeshLocation);

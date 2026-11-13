@@ -92,6 +92,7 @@ class UMaterialInterface;
 class UPrimitiveComponent;
 class USceneComponent;
 struct FCollisionQueryParams;
+struct FInteractionPrompt;
 struct FInputActionValue;
 
 UCLASS(ClassGroup = (SunsetCove), meta = (BlueprintSpawnableComponent))
@@ -319,6 +320,30 @@ public:
 	bool bDrawDebug = false;
 
 	// ------------------------------------------------------------------
+	// Configuration: HUD prompts (given to the Interaction System, shown with the key of each action on the device in use)
+	// ------------------------------------------------------------------
+
+	/** Verb of the prompt on an aimed prop: "Pick up" + the prop's display name. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Prompts")
+	FText PickUpPromptText;
+
+	/** True: while a prop is in the hand, the prompt lists what can be done with it (place, throw, drop; rotate while placing). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Prompts")
+	bool bShowCarryPrompts = true;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Prompts", meta = (EditCondition = "bShowCarryPrompts"))
+	FText PlacePromptText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Prompts", meta = (EditCondition = "bShowCarryPrompts"))
+	FText ThrowPromptText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Prompts", meta = (EditCondition = "bShowCarryPrompts"))
+	FText DropPromptText;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PropInventory|Prompts", meta = (EditCondition = "bShowCarryPrompts"))
+	FText RotatePromptText;
+
+	// ------------------------------------------------------------------
 	// Wiring (called by the character, C++ only)
 	// ------------------------------------------------------------------
 
@@ -461,6 +486,12 @@ private:
 	// ---- Interaction handler (grab) ----
 	bool CanHandleInteraction(AActor* Target);
 	bool HandleInteraction(AActor* Target);
+
+	// ---- HUD prompts (Interaction System) ----
+	/** "Pick up <name>" on an aimed prop that can be grabbed. */
+	void GetGrabPrompts(AActor* Target, TArray<FInteractionPrompt>& OutPrompts);
+	/** What the active prop can do now, by state. */
+	void GetCarryPrompts(TArray<FInteractionPrompt>& OutPrompts);
 
 	// ---- Grab rules ----
 	bool CanGrabProp(const AActor* Prop) const;

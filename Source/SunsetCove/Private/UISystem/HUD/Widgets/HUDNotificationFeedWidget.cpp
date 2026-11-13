@@ -7,6 +7,7 @@
 #include "Components/PanelWidget.h"
 #include "Components/TextBlock.h"
 #include "Components/VerticalBoxSlot.h"
+#include "Core/Settings/SunsetCovePlayerPreferences.h"
 #include "Engine/Font.h"
 #include "UISystem/HUD/SunsetCoveHUDSubsystem.h"
 #include "UObject/ConstructorHelpers.h"
@@ -249,6 +250,13 @@ void UHUDNotificationFeedWidget::NativeTick(const FGeometry& MyGeometry, float I
 
 	if (ActiveLines.Num() == 0)
 	{
+		return;
+	}
+
+	// Hints switched off (Settings > Controls) while messages were on screen: they go at once. New ones are never sent.
+	if (!USunsetCovePlayerPreferences::AreHintsEnabled())
+	{
+		ClearNotifications();
 		return;
 	}
 

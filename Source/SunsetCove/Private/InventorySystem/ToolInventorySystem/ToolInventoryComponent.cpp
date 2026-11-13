@@ -21,6 +21,9 @@ namespace
 	/** Id of the pickup handler in the Interaction System. */
 	const FName ToolPickupHandlerId(TEXT("ToolInventory.Pickup"));
 
+	/** Id of the tool prompt provider (use, drop from the menu) in the Interaction System. */
+	const FName ToolPromptsId(TEXT("ToolInventory.Tool"));
+
 	/** Hard limit of MaxTools (the ClampMax of the property). The HUD wheel stays readable up to here. */
 	constexpr int32 MaxSlotCount = 12;
 
@@ -36,6 +39,10 @@ UToolInventoryComponent::UToolInventoryComponent()
 	PrimaryComponentTick.bCanEverTick = false;
 
 	WallTraceChannel = UEngineTypes::ConvertToTraceType(ECC_Visibility);
+
+	PickUpPromptText = NSLOCTEXT("SunsetCoveToolInventory", "PromptPickUp", "Pick up");
+	DefaultUsePromptText = NSLOCTEXT("SunsetCoveToolInventory", "PromptUse", "Use");
+	DropPromptText = NSLOCTEXT("SunsetCoveToolInventory", "PromptDrop", "Drop");
 }
 
 // ----------------------------------------------------------------------
@@ -107,6 +114,7 @@ void UToolInventoryComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UInteractionComponent* InteractionComponent = Interaction.Get())
 	{
 		InteractionComponent->UnregisterInteractionHandler(ToolPickupHandlerId);
+		InteractionComponent->UnregisterPromptProvider(ToolPromptsId);
 	}
 	Interaction.Reset();
 
@@ -134,13 +142,16 @@ void UToolInventoryComponent::RegisterWithInteraction(UInteractionComponent* InI
 	if (Previous && Previous != InInteraction)
 	{
 		Previous->UnregisterInteractionHandler(ToolPickupHandlerId);
+		Previous->UnregisterPromptProvider(ToolPromptsId);
 	}
 
 	Interaction = InInteraction;
 	InInteraction->RegisterInteractionHandler(
 		ToolPickupHandlerId,
 		FInteractionCanHandleDelegate::CreateUObject(this, &UToolInventoryComponent::CanHandleInteraction),
-		FInteractionHandleDelegate::CreateUObject(this, &UToolInventoryComponent::HandleInteraction));
+		FInteractionHandleDelegate::CreateUObject(this, &UToolInventoryComponent::HandleInteraction),
+		FInteractionTargetPromptDelegate::CreateUObject(this, &UToolInventoryComponent::GetPickupPrompts));
+	InInteraction->RegisterPromptProvider(ToolPromptsId, FInteractionContextPromptDelegate::CreateUObject(this, &UToolInventoryComponent::GetToolPrompts));
 }
 
 void UToolInventoryComponent::SetupInput(UEnhancedInputComponent* EnhancedInput)
@@ -304,6 +315,48 @@ bool UToolInventoryComponent::HandleInteraction(AActor* Target)
 {
 	ASunsetCoveTool* Tool = Cast<ASunsetCoveTool>(Target);
 	return Tool && TryPickupTool(Tool);
+}
+
+// ----------------------------------------------------------------------
+// HUD prompts
+// ----------------------------------------------------------------------
+
+void UToolInventoryComponent::GetPickupPrompts(AActor* /*Target*/, TArray<FInteractionPrompt>& OutPrompts)
+{
+	// Called only for a tool CanHandleInteraction accepted. Shown even when the pickup would be refused (the refusal tells why).
+	OutPrompts.Emplace(PickUpPromptText, nullptr, EInteractionPromptTrigger::Press, /*SortOrder=*/0);
+}
+
+void UToolInventoryComponent::GetToolPrompts(TArray<FInteractionPrompt>& OutPrompts)
+{
+	if (!bShowToolPrompts)
+	{
+		return;
+	}
+
+	// The open menu: the selected sector can be dropped.
+	if (State == EToolInventoryState::SelectingTool)
+	{
+		if (GetSlotTool(HoveredSlotIndex) && DropAction)
+		{
+			OutPrompts.Emplace(DropPromptText, DropAction.Get(), EInteractionPromptTrigger::Press, 200);
+		}
+		return;
+	}
+
+	// The equipped tool can be used: shown ONLY while the player aims at something this tool works on (a seagull, a crab for the
+	// bucket...), never all the time. Not while props fill the hands either (the Prop Inventory owns the same input then).
+	ASunsetCoveTool* Equipped = GetEquippedTool();
+	if (Equipped && UseToolAction && !bHandsBusy && !Equipped->IsUseBlocked())
+	{
+		FHitResult Hit;
+		if (Equipped->FindUseTarget(Hit))
+		{
+			const FText Verb = Equipped->UsePromptText.IsEmpty() ? DefaultUsePromptText : Equipped->UsePromptText;
+			const EInteractionPromptTrigger Trigger = Equipped->UseMode == EToolUseMode::Hold ? EInteractionPromptTrigger::Hold : EInteractionPromptTrigger::Press;
+			OutPrompts.Emplace(Verb, UseToolAction.Get(), Trigger, 200);
+		}
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -869,11 +922,8 @@ void UToolInventoryComponent::CommitDrop(TWeakObjectPtr<ASunsetCoveTool> WeakToo
 		FCollisionQueryParams Params(SCENE_QUERY_STAT(ToolDropTrace), /*bTraceComplex=*/false, Owner);
 		Params.AddIgnoredActor(Tool);
 
-		FHitResult Hit;
-		if (World->LineTraceSingleByChannel(Hit, ViewLocation, Tool->GetActorLocation(), UEngineTypes::ConvertToCollisionChannel(WallTraceChannel), Params))
-		{
-			Tool->SetActorLocation(Hit.ImpactPoint + Hit.ImpactNormal * DropWallMargin, /*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
-		}
+		// Traced to the center of the tool, not its origin (the origin is the base of the tool).
+		SunsetCoveHeldItem::KeepInFrontOfWall(World, Tool, ViewLocation, UEngineTypes::ConvertToCollisionChannel(WallTraceChannel), Params, DropWallMargin);
 	}
 
 	Tool->SetActorHiddenInGame(false);

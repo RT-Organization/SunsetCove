@@ -15,11 +15,12 @@ The HUD is **one container plus independent elements**. Nothing is placed by han
 | Crosshair | `Content/UI/HUD/Elements/WBP_Crosshair` | `UHUDCrosshairWidget` | white dot, exact screen center, drawn in code |
 | Suggestion feed | `Content/UI/HUD/Elements/WBP_NotificationFeed` | `UHUDNotificationFeedWidget` | gray text lines, top-left, fade in / out |
 | Tool radial menu | `Content/UI/HUD/Elements/WBP_ToolRadialMenu` | `UToolRadialMenuWidget` | GTA-style wheel, one slice per tool slot, drawn in code |
+| Interaction prompt | `Content/UI/HUD/Elements/WBP_InteractionPrompt` (+ row `WBP_InteractionPromptRow`) | `UHUDInteractionPromptWidget` (rows: CoreFramework `UInputPromptWidget`) | "[E] Pick up" / "[X] Pick up" (key icons, no background, no object name): what the player can do now + the key on the device in use. Data from `UInteractionComponent::OnPromptsChanged`; details in `Docs/InteractionSystem/Interaction_System.md` §9 |
 | Message hub | (no asset) | `USunsetCoveHUDSubsystem` (Game Instance Subsystem) | game systems ask for messages / crosshair hiding here |
 | Messages | `Content/UI/HUD/Data/DT_HUDNotifications` | row struct `FHUDNotificationRow` | text of every message, by id |
 | Settings | Project Settings > Game > **Sunset Cove UI** | `USunsetCoveUISettings` | which notification table to use (`DefaultGame.ini`) |
 
-All three elements derive from `USunsetCoveHUDElementWidget` (→ `UBaseUserWidget`), which stretches each element over the whole slot and gives it the local player's pawn.
+All the elements derive from `USunsetCoveHUDElementWidget` (→ `UBaseUserWidget`), which stretches each element over the whole slot and gives it the local player's pawn.
 
 ### How the HUD starts
 
@@ -29,7 +30,7 @@ L_xxx map → GameMode HUD class BP_Startup_Gameplay (ABaseHUD, CoreFramework, S
       (DA_UIConfig > Screens: UI.Screen.HUD → WBP_HUD on CoreFramework.UI.Layer.Game, preloaded; input Game Only)
       └ WBP_HUD.NativeConstruct registers DefaultElementSlot as CoreFramework.UI.HUDSlot.Default
           └ for each entry of DA_UIConfig > HUD Elements: async load the class, CreateWidget, add to the slot
-              Crosshair → NotificationFeed → ToolRadialMenu      (array order = draw order, last on top)
+              Crosshair → NotificationFeed → ToolRadialMenu → InteractionPrompt   (array order = draw order, last on top)
                 └ each element registers with the CoreFramework binding hub → OnUIPawnBound(pawn)
                     the element finds what it needs on the pawn BY CLASS (UToolInventoryComponent) — never the character class
 ```

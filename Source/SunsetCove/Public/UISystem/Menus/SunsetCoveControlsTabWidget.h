@@ -12,6 +12,8 @@
 // WHAT THIS CLASS ADDS
 //   ControllerIconsRow (option row): Automatic / Xbox / PlayStation, through USunsetCoveControllerIconsSubsystem.
 //   SprintModeRow (option row): Hold / Toggle, through USunsetCovePlayerPreferences (default Hold).
+//   HintsRow (option row): On / Off, through USunsetCovePlayerPreferences (default On). Off hides the suggestion feed and the
+//   interaction prompt.
 //   Changes preview at once, are saved on Apply (Back) and restored on Revert like the rest.
 
 #pragma once
@@ -57,6 +59,13 @@ protected:
 	UPROPERTY(BlueprintReadOnly, Transient, meta = (BindWidgetOptional))
 	TObjectPtr<UOptionSettingRowWidget> SprintModeRow;
 
+	/** Names of On / Off, in that order. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Controls Settings")
+	TArray<FText> HintsNames;
+
+	UPROPERTY(BlueprintReadOnly, Transient, meta = (BindWidgetOptional))
+	TObjectPtr<UOptionSettingRowWidget> HintsRow;
+
 private:
 	UFUNCTION()
 	void HandleControllerIconsChanged(UOptionSettingRowWidget* Row, int32 SelectedIndex);
@@ -64,9 +73,14 @@ private:
 	UFUNCTION()
 	void HandleSprintModeChanged(UOptionSettingRowWidget* Row, int32 SelectedIndex);
 
+	UFUNCTION()
+	void HandleHintsChanged(UOptionSettingRowWidget* Row, int32 SelectedIndex);
+
 	void RefreshControllerIconsRow();
 	void RefreshSprintModeRow();
+	void RefreshHintsRow();
 
 	ESunsetCoveControllerIcons IconsSnapshot = ESunsetCoveControllerIcons::Automatic;
 	ESunsetCoveSprintMode SprintSnapshot = ESunsetCoveSprintMode::Hold;
+	bool bHintsSnapshot = true;
 };

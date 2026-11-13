@@ -82,6 +82,7 @@ class UInputAction;
 class UInteractionComponent;
 class UPrimitiveComponent;
 class USceneComponent;
+struct FInteractionPrompt;
 
 UCLASS(ClassGroup = (SunsetCove), meta = (BlueprintSpawnableComponent))
 class SUNSETCOVE_API UToolInventoryComponent : public UActorComponent
@@ -227,6 +228,26 @@ public:
 	/** Trace channel used to keep a dropped tool out of walls. Walls must BLOCK it. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Drop")
 	TEnumAsByte<ETraceTypeQuery> WallTraceChannel;
+
+	// ------------------------------------------------------------------
+	// Configuration: HUD prompts (given to the Interaction System, shown with the key of each action on the device in use)
+	// ------------------------------------------------------------------
+
+	/** Verb of the prompt on an aimed tool: "Pick up" + the tool's display name. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Prompts")
+	FText PickUpPromptText;
+
+	/** True: the prompt shows the use action of the equipped tool, and the drop action on the tool selected in the open menu. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Prompts")
+	bool bShowToolPrompts = true;
+
+	/** Verb of the use prompt when the equipped tool has no Use Prompt Text of its own. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Prompts", meta = (EditCondition = "bShowToolPrompts"))
+	FText DefaultUsePromptText;
+
+	/** Verb of the drop prompt in the open menu: "Drop" + the selected tool's name. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "ToolInventory|Prompts", meta = (EditCondition = "bShowToolPrompts"))
+	FText DropPromptText;
 
 	// ------------------------------------------------------------------
 	// Wiring (called by the character, C++ only)
@@ -419,6 +440,10 @@ private:
 	// ---- Interaction handler (pickup) ----
 	bool CanHandleInteraction(AActor* Target);
 	bool HandleInteraction(AActor* Target);
+
+	// ---- HUD prompts (Interaction System) ----
+	void GetPickupPrompts(AActor* Target, TArray<FInteractionPrompt>& OutPrompts);
+	void GetToolPrompts(TArray<FInteractionPrompt>& OutPrompts);
 
 	// ---- Slots ----
 	/** Spawns and picks up StartingTools (authority only). Runs one frame after BeginPlay, when every component has started. */

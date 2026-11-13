@@ -24,6 +24,9 @@ namespace
 	/** Id of the grab handler in the Interaction System. */
 	const FName PropGrabHandlerId(TEXT("PropInventory.Grab"));
 
+	/** Id of the carry prompt provider (place / throw / drop) in the Interaction System. */
+	const FName PropCarryPromptsId(TEXT("PropInventory.Carry"));
+
 	/** One slot per hand. */
 	constexpr int32 SlotCount = 2;
 
@@ -49,6 +52,12 @@ UPropInventoryComponent::UPropInventoryComponent()
 	ObstacleObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_WorldDynamic));
 	ObstacleObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_PhysicsBody));
 	ObstacleObjectTypes.Add(UEngineTypes::ConvertToObjectType(ECC_Pawn));
+
+	PickUpPromptText = NSLOCTEXT("SunsetCovePropInventory", "PromptPickUp", "Pick up");
+	PlacePromptText = NSLOCTEXT("SunsetCovePropInventory", "PromptPlace", "Place");
+	ThrowPromptText = NSLOCTEXT("SunsetCovePropInventory", "PromptThrow", "Throw");
+	DropPromptText = NSLOCTEXT("SunsetCovePropInventory", "PromptDrop", "Drop");
+	RotatePromptText = NSLOCTEXT("SunsetCovePropInventory", "PromptRotate", "Rotate");
 }
 
 // ----------------------------------------------------------------------
@@ -72,6 +81,7 @@ void UPropInventoryComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	if (UInteractionComponent* InteractionComponent = Interaction.Get())
 	{
 		InteractionComponent->UnregisterInteractionHandler(PropGrabHandlerId);
+		InteractionComponent->UnregisterPromptProvider(PropCarryPromptsId);
 	}
 	Interaction.Reset();
 
@@ -132,13 +142,16 @@ void UPropInventoryComponent::RegisterWithInteraction(UInteractionComponent* InI
 	if (Previous && Previous != InInteraction)
 	{
 		Previous->UnregisterInteractionHandler(PropGrabHandlerId);
+		Previous->UnregisterPromptProvider(PropCarryPromptsId);
 	}
 
 	Interaction = InInteraction;
 	InInteraction->RegisterInteractionHandler(
 		PropGrabHandlerId,
 		FInteractionCanHandleDelegate::CreateUObject(this, &UPropInventoryComponent::CanHandleInteraction),
-		FInteractionHandleDelegate::CreateUObject(this, &UPropInventoryComponent::HandleInteraction));
+		FInteractionHandleDelegate::CreateUObject(this, &UPropInventoryComponent::HandleInteraction),
+		FInteractionTargetPromptDelegate::CreateUObject(this, &UPropInventoryComponent::GetGrabPrompts));
+	InInteraction->RegisterPromptProvider(PropCarryPromptsId, FInteractionContextPromptDelegate::CreateUObject(this, &UPropInventoryComponent::GetCarryPrompts));
 }
 
 void UPropInventoryComponent::SetupInput(UEnhancedInputComponent* EnhancedInput)
@@ -267,6 +280,54 @@ bool UPropInventoryComponent::CanHandleInteraction(AActor* Target)
 bool UPropInventoryComponent::HandleInteraction(AActor* Target)
 {
 	return TryGrabProp(Target);
+}
+
+// ----------------------------------------------------------------------
+// HUD prompts
+// ----------------------------------------------------------------------
+
+void UPropInventoryComponent::GetGrabPrompts(AActor* /*Target*/, TArray<FInteractionPrompt>& OutPrompts)
+{
+	// Called only for a target CanHandleInteraction accepted. The key is the Interact action (InputAction left null).
+	OutPrompts.Emplace(PickUpPromptText, nullptr, EInteractionPromptTrigger::Press, /*SortOrder=*/0);
+}
+
+void UPropInventoryComponent::GetCarryPrompts(TArray<FInteractionPrompt>& OutPrompts)
+{
+	if (!bShowCarryPrompts || !GetActiveProp())
+	{
+		return;
+	}
+
+	// An action whose Input Action is not set would fall back to Interact (the wrong key): it is left out.
+	auto Add = [&OutPrompts](const FText& Text, UInputAction* Action, EInteractionPromptTrigger Trigger, int32 SortOrder, bool bAvailable = true)
+	{
+		if (Action)
+		{
+			OutPrompts.Emplace(Text, Action, Trigger, SortOrder, bAvailable);
+		}
+	};
+
+	// Sort orders after the focus prompt (0): the aimed object comes first, the hand next.
+	switch (State)
+	{
+	case EPropInventoryState::Placing:
+		// The Place input is held: letting go puts the prop down, if the hologram is on a valid spot.
+		Add(PlacePromptText, PlaceAction, EInteractionPromptTrigger::Release, 100, bPlacementValid);
+		Add(RotatePromptText, RotateAction, EInteractionPromptTrigger::Press, 110);
+		break;
+
+	case EPropInventoryState::ChargingThrow:
+		Add(ThrowPromptText, ThrowAction, EInteractionPromptTrigger::Release, 100);
+		break;
+
+	case EPropInventoryState::Idle:
+	default:
+		Add(PlacePromptText, PlaceAction, EInteractionPromptTrigger::Hold, 100);
+		Add(ThrowPromptText, ThrowAction, EInteractionPromptTrigger::Hold, 110);
+		Add(DropPromptText, DropAction, EInteractionPromptTrigger::Press, 120);
+		break;
+	}
 }
 
 // ----------------------------------------------------------------------
@@ -1149,11 +1210,8 @@ void UPropInventoryComponent::CommitRelease(TWeakObjectPtr<AActor> WeakProp, ECo
 		Params.AddIgnoredActor(Prop);
 		AddHeldPropsToIgnore(Params);
 
-		FHitResult Hit;
-		if (World->LineTraceSingleByChannel(Hit, ViewLocation, Prop->GetActorLocation(), UEngineTypes::ConvertToCollisionChannel(SurfaceTraceChannel), Params))
-		{
-			Prop->SetActorLocation(Hit.ImpactPoint + Hit.ImpactNormal * ReleaseWallMargin, /*bSweep=*/false, nullptr, ETeleportType::TeleportPhysics);
-		}
+		// Traced to the center of the prop, not its origin (the origin is the base of the prop).
+		SunsetCoveHeldItem::KeepInFrontOfWall(World, Prop, ViewLocation, UEngineTypes::ConvertToCollisionChannel(SurfaceTraceChannel), Params, ReleaseWallMargin);
 	}
 
 	if (Primitive)

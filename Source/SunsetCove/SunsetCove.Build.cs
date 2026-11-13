@@ -22,7 +22,8 @@ public class SunsetCove : ModuleRules
 			"NavigationSystem", 
 			"AIModule", 
 			"GameplayTasks",
-			"CoreFramework" 
+			"PhysicsCore",      // physical materials / surfaces (footsteps choose the sound by the ground)
+			"CoreFramework"
 		});
 
 		// AssetRegistry: only the editor helper "Populate From Naming Convention" of the arms animation data asset uses it.

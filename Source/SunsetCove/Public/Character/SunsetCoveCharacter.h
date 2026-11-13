@@ -39,6 +39,7 @@ class UInteractionComponent;
 class UArmsAnimationComponent;
 class UPropInventoryComponent;
 class UToolInventoryComponent;
+class USunsetCoveFootstepComponent;
 enum class EMovementAction : uint8;
 enum class EMovementDomain : uint8;
 
@@ -116,6 +117,13 @@ public:
 	 */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SunsetCove|Components")
 	TObjectPtr<UArmsAnimationComponent> ArmsAnimation;
+
+	/**
+	 * The sound of the feet (Public/AudioSystem/Footsteps/): a step every stride, chosen by the ground under the feet (landscape layer
+	 * or mesh physical material, or the sea). Footstep Set = DA_Footsteps on BP_Character.
+	 */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "SunsetCove|Components")
+	TObjectPtr<USunsetCoveFootstepComponent> Footsteps;
 
 	// ------------------------------------------------------------------
 	// HUD messages (row names of the HUD notification table, see Public/UISystem/HUD/)

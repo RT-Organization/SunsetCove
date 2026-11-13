@@ -51,9 +51,11 @@ Type **Audio Config Data Asset** (CoreFramework). It is the single place that sa
 | `Audio.Cue.UI.Click` | `Audio/UI/Beach/S_UI_Click_Shell` | UI | 1.0 (±0.05) | 0.06 | on |
 | `Audio.Cue.UI.PopupOpen` | `Audio/UI/Beach/S_UI_Open_Breeze` | UI | 1.0 (±0.05) | 0.03 | on |
 | `Audio.Cue.UI.PopupClose` | `Audio/UI/Beach/S_UI_Close_Breeze` | UI | 1.0 (±0.05) | 0.03 | on |
-| `Audio.Cue.Music.MainMenu` | **empty — add the track** | Music | 1.0 | 0 | off |
+| `Audio.Cue.Music.MainMenu` | **empty — add the track** (looping, `SC_Music`) | Music | 1.0 | 0 | off |
 | `Audio.Cue.Music.Gameplay` | **empty — add the track** | Music | 1.0 | 0 | off |
-| `Audio.Cue.Ambient.Beach` | **empty — add the loop** | Ambient | 1.0 | 0 | off |
+| `Audio.Cue.Ambient.MainMenu` | `Audio/Ambient/S_AmbMainMenu_Waves_LoopA` (looping) | Ambient | 0.9 | 0 | on |
+| `Audio.Cue.Ambient.ShoreWaves` | `Audio/Ambient/S_AmbGameplay_Waves_Loop` (looping; played by the sea along its shoreline, 3D) | Ambient | 1.0 | 0 | on |
+| `Audio.Cue.Ambient.Wind` | `Audio/Ambient/S_Amb_Wind_Loop` (looping; 2D, volume driven by the wind ambience) | Ambient | 0.3 | 0 | on |
 
 **UI Defaults**: Hover = `Audio.Cue.UI.Hover`, Click = `Audio.Cue.UI.Click`, Screen Open = `Audio.Cue.UI.PopupOpen`, Screen Close = `Audio.Cue.UI.PopupClose`.
 
@@ -82,7 +84,7 @@ Which sounds the game needs, their names and folders: [`AudioSystem_SoundList.md
 
 | Where | How |
 |---|---|
-| Music / ambience of a map | already wired: just fill the Sound of `Audio.Cue.Music.MainMenu`, `.Music.Gameplay`, `.Ambient.Beach` |
+| Music / ambience of a map | already wired: just fill the Sound of `Audio.Cue.Music.MainMenu` / `.Music.Gameplay`. World ambience (waves on the beach, wind) is played by actors in the level, see `Docs/Environment/Sea_Setup_Guide.md` §7-9 |
 | Blueprint | *Play Cue 2D* / *Play Cue At Location* / *Play Cue Attached* (Audio function library), *Play Music*, *Play Ambient* |
 | An animation (arms, props) | notify track > *Add Notify > Play Audio Cue*; Cue Tag; Audience **Owner Only** for first-person arms |
 | A widget | *Play UI Sound* (Cue Tag) on any CoreFramework widget |
@@ -94,8 +96,8 @@ Nothing else to register. A tag that has no row, or a row without a Sound, logs 
 
 | Blueprint (`Content/Core/`) | Class Defaults > Audio > Map Audio |
 |---|---|
-| `BP_GameMode_MainMenu` | Music Cue `Audio.Cue.Music.MainMenu`, Ambient Cue `Audio.Cue.Ambient.Beach`, Fade Time -1 |
-| `BP_GameMode_Gameplay` | Music Cue `Audio.Cue.Music.Gameplay`, Ambient Cue `Audio.Cue.Ambient.Beach`, Fade Time -1 |
+| `BP_GameMode_MainMenu` | Music Cue `Audio.Cue.Music.MainMenu`, Ambient Cue `Audio.Cue.Ambient.MainMenu` (waves heard from the beach), Fade Time -1 |
+| `BP_GameMode_Gameplay` | Music Cue `Audio.Cue.Music.Gameplay`, Ambient Cue **empty** (the cove ambience is in the world: `BP_Sea` + `BP_WindAmbience`; the empty cue fades the menu waves out), Fade Time -1 |
 | `BP_GameMode_Test` | empty (test maps are silent; fill it if you want music while testing) |
 
 - Fade Time **-1** = the config's defaults. **0** = hard cut.

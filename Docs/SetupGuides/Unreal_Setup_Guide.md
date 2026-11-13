@@ -22,6 +22,8 @@
 | 9 | [Menus: buttons, popups, fonts and the main menu](#9-menus-buttons-popups-fonts-and-the-main-menu) | a new menu button, a yes / no question, a new font, the menu background |
 | 10 | [Audio: a new sound, music or volume category](#10-audio-a-new-sound-music-or-volume-category) | a new sound effect, the music of a map, a new slider in Options > Audio |
 | 11 | [Settings and input: options, remappable actions, button prompts](#11-settings-and-input-options-remappable-actions-button-prompts) | a new line in Options, a new action in Input Mapping, a key prompt in the world or the HUD, a new controller family |
+| 12 | [The sea and the world ambience (waves, wind)](#12-the-sea-and-the-world-ambience-waves-wind) | placing the sea on the beach, its look, the waves sound, the wind |
+| 13 | [Footsteps and kinds of ground](#13-footsteps-and-kinds-of-ground) | the landscape arrives (sand / mud layers), a new kind of ground, replacing the step sounds |
 
 > **How this guide was written.** It was derived by reading the C++ in `Source/SunsetCove/` and the existing system docs, and by looking at the folder structure of `Content/` (not the contents of the assets). Nothing here was run in the editor. Steps that depend on what is inside an asset (for example the exact bones of your Blender rig) are marked **(check)**.
 
@@ -135,24 +137,20 @@ You can build and test the Blueprint **before** any of this is delivered: a miss
 | Components panel > **PropMesh** > Details > Mesh > **Skeletal Mesh Asset** | the prop's skeletal mesh |
 | Class Defaults > **Prop \| Identity** > **Prop Id** | leave empty if the Blueprint is named `BP_<Item>`; otherwise the id |
 
-Compile and save. The Blueprint already has by itself (done in C++): a collision box as root sized to the mesh, the physics, the grip alignment, grab / place / throw / drop, and the hologram.
+Compile and save. The Blueprint already has by itself (done in C++): a collision box as root sized to the mesh, the physics, the grip alignment, grab / place / throw / drop, the hologram and the HUD prompt ("[E] Pick up").
 
-**Do not** move `PropMesh` in the viewport (Auto Fit re-centers it), do not change the collision preset of `CollisionBody` (`PhysicsActor`), do not add the interfaces.
+**The origin of every prop is its base** (since 2026-11-12). The root `CollisionBody` is a *Pivot Box Collision*
+(`USunsetCovePivotBoxComponent`, `Origin = Bottom`): the actor origin is the center of the **bottom** of the box, and Auto Fit puts
+the bottom of the mesh on it. So a prop dragged into the level, snapped to the floor (**End**), spawned at a point or placed by the
+player stands **on** the surface — whatever pivot the FBX has (centered, at a corner...). Nothing to fix in Blender or with offsets.
+`CollisionBody > Shape > Origin = Center` brings back the old centered origin for a special case.
+
+**Do not** move `PropMesh` in the viewport (Auto Fit places it), do not change the collision preset of `CollisionBody` (`PhysicsActor`), do not add the interfaces.
 
 **Optional, per prop (Class Defaults):**
 
 | Category | Property | Default | When to change it |
 |---|---|---|---|
-| `Prop \| Grip` | `Grip Socket Name` / `Left Grip Socket Name` | `Grip_R` / `Grip_L` | the Blender bones have other names |
-| `Prop \| Grip` | `Hold Location Offset` / `Hold Rotation Offset` | 0 | a quick nudge in the hand without going back to Blender |
-| `Prop \| Collision` | `Auto Fit Collision To Mesh`, `Collision Padding` | on, 2 cm | off = size the box yourself with `Collision Box Extent`; padding makes it easier to aim at |
-| `Prop \| Physics` | `Mass Kg` | 10 | how it reacts when pushed. The throw speed does not depend on it |
-| `Prop \| Physics` | `Start Simulating Physics` | off | on = it falls/can be pushed from the start. Leave off for a prop that is part of the scene |
-| `Prop \| Drop` | `Drop Upright` | on | when you drop it (Q) the prop is turned upright (no pitch/roll, only your heading) before it falls, so a sunbed lands flat and an umbrella stands. Thrown props keep their tumble |
-| `Prop \| Drop` | `Drop Rotation Offset` | 0 | extra rotation on top of upright, in the prop's own space, for a prop whose closed shape should rest on another side (for example Pitch 90 to lay an umbrella down) |
-| `Prop \| Rules` | `Can Be Picked Up` | on | off = fixed prop (settable at runtime too) |
-| `Prop \| Animation` | `Picked Up Animation` = **Close**, `Placed Animation` = **Open** | none | the simple way to open and close the prop (see 2.6). Close plays on the ground at the pickup and the prop waits for it before going into the hand |
-| `Prop \| Animation` | `Open Pose Animation` / `Closed Pose Animation` | none | optional one-frame poses (see 2.6) |
 
 ### 2.5 Rest spots (only if visitors use the prop)
 
@@ -255,12 +253,13 @@ Not needed: any new ABP, any change to `ABP_FPArms_Items`, any change to `BP_Cha
 
 ### 2.8 Put it in the level and test
 
-1. Drag the Blueprint into the level (a prop in the level is solid and stays put until grabbed).
+1. Drag the Blueprint into the level (a prop in the level is solid and stays put until grabbed). It lands **on** the floor (origin at its base); **End** snaps it down to the floor.
 2. Play, and run the table:
 
 | Do | Expect |
 |---|---|
-| look at it (< 2.5 m), **E** | it plays Close where it lies, then goes into the right hand, `Grip_R` on `Prop_R`; second prop goes to the left hand |
+| look at it (< 2.5 m) | the HUD prompt shows `[E] Pick up` (`[X]` with a gamepad) |
+| look at it (< 2.5 m), **E** | it plays Close where it lies, then goes into the right hand, `Grip_R` on `Prop_R`; second prop goes to the left hand; the prompt lists Place / Throw / Drop |
 | **E**, then **Q** before Close ends | it attaches at once, closed, then drops closed |
 | hold **left mouse**, wheel | hologram shows the **open** prop, follows, green on valid ground, wheel rotates it |
 | release over green | the prop flies to the spot opening and lands upright; its rest spots turn on at the landing |
@@ -340,6 +339,7 @@ Same as 2.2, into `Content/Mesh/Tools/<Item>/`.
 | Property | Default | Typical values |
 |---|---|---|
 | `Use Mode` | Press | **Press** one use per click (bucket, toy, garbage bag); **Hold** repeats while held (spray) |
+| `Use Prompt Text` | empty (= "Use") | the verb of the HUD prompt while the tool is equipped ("Spray", "Fill bucket") |
 | `Use Cooldown Seconds` | 0.4 | minimum time between two uses |
 | `Hold Use Interval` | 0.2 | Hold mode: time between repeats |
 | `Use Range` | 250 cm | how far it reaches from the camera |
@@ -545,6 +545,20 @@ A missing row only logs `HUD: no notification row '<id>'` (filter `LogSunsetCove
 | Feed position | `WBP_NotificationFeed` designer: move the Vertical Box **MessageContainer** (keep its name) |
 | Wheel radii, colors, pop-out, icons, label, slice texture / material | `WBP_ToolRadialMenu` > Class Defaults > `Radial \| ...` (the designer shows a live preview) |
 | Number of slices | `BP_Character` > Tool Inventory > **Max Tools** (1-12) |
+| Interaction prompt position | `WBP_InteractionPrompt` designer: move the Vertical Box **PromptList** (keep its name) |
+| Interaction prompt row look | `WBP_InteractionPromptRow` (no background; Class Defaults: Glyph Size 26, Keyboard Display = Glyph), `BP_TextStyle_HUD_Prompt` (label, 18) |
+| Interaction prompt wording | `WBP_InteractionPrompt` > Class Defaults > `Interaction Prompt` (formats, max rows, dimmed opacity); verbs on `BP_Character` > Prop / Tool Inventory > `Prompts` |
+| Hide the interaction prompt during an event | **Get SunsetCoveHUDSubsystem** > **Set Interaction Prompts Hidden By** |
+| Player turns hints off | Options > Controls > **Hints** = Off hides the suggestion feed and the interaction prompt (`[SunsetCove.Input] ShowHints`) |
+
+### 8.3.1 The interaction prompt ("[E] Pick up")
+
+Element `InteractionPrompt` of `DA_UIConfig` > HUD Elements (`WBP_InteractionPrompt`, parent `HUD Interaction Prompt Widget`).
+It lists what the player can do now and the key for it (dark keyboard glyphs or gamepad icons, switching the moment the device
+changes, remaps included). **Nothing to set up for a new prop or tool** (the inventories give the prompts). A tool's **Use**
+prompt appears only while the player aims at something that tool works on: make the target implement the *Tool Target
+Interface* (section 3.6). For an actor with the *Interactable Interface*, implement **Get Interaction Prompt** (the text). For a
+new C++ system, see `Docs/InteractionSystem/Interaction_System.md` section 9.
 
 ### 8.4 A new HUD element (clock, money, minimap...)
 
@@ -592,7 +606,7 @@ Use the existing popup, never a new widget: `UBaseConfirmPopupWidget::OpenConfir
 |---|---|---|---|
 | 1 | `DA_UIConfig` > Screens | only for a **new screen** | tag + widget class + layer (popups on `CoreFramework.UI.Layer.Modal`) |
 | 2 | Project Settings > Game > **Sunset Cove Game Flow** | only to change the world slot name or the maps New Game / Continue open | |
-| 3 | `L_MainMenu` | only to change the menu background | move `MenuCamera`, edit `PP_MenuSunset`, swap the cove level instance |
+| 3 | `L_MainMenuMap` | only to change the menu background | the menu scene: move `MenuCamera`, edit `PP_MenuSunset`, add / change environment actors. **`L_MainMenu` stays empty**: it only holds the World Settings (game mode) and `LI_MainMenuMap`, the Level Instance of `L_MainMenuMap` |
 | 4 | `Plugins/CoreFramework` | **Never** | |
 
 ---
@@ -681,3 +695,60 @@ Drag **`WBP_InputPrompt`** where the hint goes and set **one** source:
 | 3 | `DefaultInput.ini` `bEnableUserSettings=True` | **No** | already on (Input Mapping needs it) |
 | 4 | Project Settings > User Interface > Render Focus Rule | **No** | stays **Never** (rows draw their own focus) |
 | 5 | `Plugins/CoreFramework` | **Never** | framework changes go to `FrameworkPatches/` and the FrameWorks repository |
+
+---
+
+## 12. The sea and the world ambience (waves, wind)
+
+The full recipe (mesh, material, foam, textures to find, attenuation, tuning) is a guide of its own:
+[`Docs/Environment/Sea_Setup_Guide.md`](../Environment/Sea_Setup_Guide.md). How it works: [`Sea_Architecture.md`](../Environment/Sea_Architecture.md).
+
+### 12.1 In a new gameplay level (the short version)
+
+1. Drag **`BP_Sea`** (`Content/Environment/Water/`) in front of the beach: its **Z is the still water level**. Select it, then its
+   *Shoreline* spline, and put the spline points on the waterline of the beach (Alt-drag a point to add one).
+2. Drag **`BP_WindAmbience`** (`Content/Environment/Ambience/`) anywhere in the level (one per level, never in the main menu).
+3. Play: near the water the waves surround you and follow you along the beach; inland they fade; under the high rocks the
+   wind almost disappears. *Draw Debug* on both actors shows what they measure.
+
+`L_Gameplay` has a **test** sea (`Sea_TEST_MoveOnRealWaterline`, still level 1.1 m under the blockout floor so even wave crests stay below it, shoreline 20 m
+in front of the PlayerStart) so the waves can be heard before the landscape exists: move it onto the real waterline (or
+delete it and place `BP_Sea`) when the cove landscape is in.
+
+### 12.2 What else to touch (the checklist)
+
+| # | Where | Needed? | What to do |
+|---|---|---|---|
+| 1 | `DA_AudioConfig` > Cues | only for a **new** world sound | the sea and the wind cues exist: `Audio.Cue.Ambient.ShoreWaves`, `.Wind` |
+| 2 | GameMode > Map Audio | **No** | gameplay maps have no map ambience (it is in the world); the main menu plays `Audio.Cue.Ambient.MainMenu` |
+| 3 | The sea material / mesh | yes, for the look | `Sea_Setup_Guide.md` steps 1-6 (the C++ already drives the waves) |
+| 4 | Landscape material | optional | wet sand from `MPC_Sea` `SeaLevel` (`Sea_Setup_Guide.md` §6) |
+| 5 | Collision of rocks / cliffs | **No** | they block *Visibility* like any mesh, which is what the wind's shelter rays need |
+| 6 | `Plugins/CoreFramework` | **Never** directly | framework changes go to `FrameworkPatches/` |
+
+---
+
+## 13. Footsteps and kinds of ground
+
+Full description: [`Docs/AudioSystem/Footsteps.md`](../AudioSystem/Footsteps.md). The ground under the feet picks the sound through
+its **Physical Material** (Sand, Mud, Rock, Wood, Water); the sea is detected by itself (no collision needed).
+
+### 13.1 When the landscape arrives
+
+| Where | Set |
+|---|---|
+| each landscape **Layer Info** (paint layer) | *Phys Material* = `PM_Sand` / `PM_Mud` (`Content/Environment/PhysicalMaterials/`) |
+| rock / cliff meshes (their material, or the mesh collision override) | *Phys Material* = `PM_Rock` |
+| a wooden deck later | `PM_Wood` (and a Wood row with sounds in `DA_Footsteps`) |
+
+Anything without a physical material plays the **Default** row of `DA_Footsteps` (sand).
+
+### 13.2 What else to touch (the checklist)
+
+| # | Where | Needed? | What to do |
+|---|---|---|---|
+| 1 | Project Settings > Physics > Physical Surface | only for a **new kind** of ground | name the next free Surface Type (never reorder the existing ones) |
+| 2 | `Content/Environment/PhysicalMaterials/` | only for a new kind | duplicate a `PM_*`, set *Surface Type* |
+| 3 | `Content/Audio/DA_Footsteps` | for a new kind, or to change sounds | a row: Surface + 4-6 steps + 1-2 landings + volume |
+| 4 | `Content/Audio/SFX/Footsteps/<Surface>/` | to replace the placeholders | re-import over the same names (mono, short, *Sound Class* `SC_SFX`) |
+| 5 | `BP_Character` > Footsteps | **No** | already uses `DA_Footsteps`; tune stride / volumes there (Footsteps.md §4) |
